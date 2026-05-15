@@ -17,13 +17,12 @@ FROM node:22-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=3000
 
-COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/server ./server
 COPY --from=build /app/client/dist ./client/dist
 
-EXPOSE 3001
+EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+CMD ["node", "server/index.js"]
