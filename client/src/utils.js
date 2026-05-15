@@ -7,14 +7,20 @@ export function createEmptyTotals(items) {
   }, {});
 }
 
+export function createEmptyMapState(items) {
+  return {
+    startedAt: new Date().toISOString(),
+    rounds: 0,
+    totals: createEmptyTotals(items),
+    history: [],
+    sessions: []
+  };
+}
+
 export function createNewPlayer(name) {
   const trimmedName = name.trim();
   const mapState = MAPS.reduce((accumulator, map) => {
-    accumulator[map.id] = {
-      rounds: 0,
-      totals: createEmptyTotals(map.items),
-      history: []
-    };
+    accumulator[map.id] = createEmptyMapState(map.items);
     return accumulator;
   }, {});
 
@@ -69,11 +75,31 @@ export function applyRound(player, mapId, roundDrops) {
 
 export function resetMapProgress(player, mapId, items) {
   const nextPlayer = structuredClone(player);
-  nextPlayer.maps[mapId] = {
-    rounds: 0,
-    totals: createEmptyTotals(items),
-    history: []
+  nextPlayer.maps[mapId] = createEmptyMapState(items);
+  return nextPlayer;
+}
+
+export function finishSession(player, mapId, items) {
+  const nextPlayer = structuredClone(player);
+  const mapState = nextPlayer.maps[mapId];
+
+  if (!mapState || mapState.rounds === 0) {
+    return player;
+  }
+
+  const archivedSession = {
+    id: crypto.randomUUID(),
+    startedAt: mapState.startedAt,
+    finishedAt: new Date().toISOString(),
+    rounds: mapState.rounds,
+    totals: { ...mapState.totals }
   };
+
+  nextPlayer.maps[mapId] = {
+    ...createEmptyMapState(items),
+    sessions: [archivedSession, ...(mapState.sessions ?? [])].slice(0, 8)
+  };
+
   return nextPlayer;
 }
 
@@ -91,4 +117,8 @@ export function getStackProgress(amount) {
 
 export function hasDrops(roundDrops) {
   return Object.values(roundDrops).some((amount) => amount > 0);
+}
+
+export function getTotalItems(totals) {
+  return Object.values(totals).reduce((sum, value) => sum + value, 0);
 }

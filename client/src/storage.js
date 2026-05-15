@@ -1,4 +1,5 @@
 import { MAPS } from "./mapConfig";
+import { createEmptyMapState } from "./utils";
 
 const STORAGE_KEY = "farmtracks.players.v1";
 
@@ -33,6 +34,31 @@ function normalizeHistory(history, items) {
     .slice(0, 12);
 }
 
+function normalizeSessions(sessions, items) {
+  if (!Array.isArray(sessions)) {
+    return [];
+  }
+
+  return sessions
+    .filter((entry) => entry && typeof entry === "object")
+    .map((entry, index) => {
+      const totals = items.reduce((accumulator, item) => {
+        const value = Number.parseInt(entry.totals?.[item.id] ?? 0, 10);
+        accumulator[item.id] = Number.isFinite(value) && value > 0 ? value : 0;
+        return accumulator;
+      }, {});
+
+      return {
+        id: typeof entry.id === "string" ? entry.id : `session-${index}`,
+        startedAt: typeof entry.startedAt === "string" ? entry.startedAt : new Date().toISOString(),
+        finishedAt: typeof entry.finishedAt === "string" ? entry.finishedAt : new Date().toISOString(),
+        rounds: Number.isFinite(entry.rounds) && entry.rounds > 0 ? entry.rounds : 0,
+        totals
+      };
+    })
+    .slice(0, 8);
+}
+
 function normalizePlayer(player, index) {
   if (!player || typeof player !== "object") {
     return null;
@@ -46,6 +72,7 @@ function normalizePlayer(player, index) {
 
   const maps = MAPS.reduce((accumulator, map) => {
     const savedMap = player.maps?.[map.id] ?? {};
+    const emptyState = createEmptyMapState(map.items);
     const totals = createEmptyTotals(map.items);
 
     for (const item of map.items) {
@@ -54,9 +81,11 @@ function normalizePlayer(player, index) {
     }
 
     accumulator[map.id] = {
+      startedAt: typeof savedMap.startedAt === "string" ? savedMap.startedAt : emptyState.startedAt,
       rounds: Number.isFinite(savedMap.rounds) && savedMap.rounds > 0 ? savedMap.rounds : 0,
       totals,
-      history: normalizeHistory(savedMap.history, map.items)
+      history: normalizeHistory(savedMap.history, map.items),
+      sessions: normalizeSessions(savedMap.sessions, map.items)
     };
 
     return accumulator;
