@@ -1,0 +1,374 @@
+:root {
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+  color: #f8f5ec;
+  background:
+    radial-gradient(circle at top left, rgba(151, 203, 255, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(127, 255, 193, 0.12), transparent 24%),
+    linear-gradient(160deg, #10191f 0%, #18252e 52%, #0f171d 100%);
+  color-scheme: dark;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 0;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 24px;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.sidebar,
+.panel,
+.hero-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 17, 21, 0.72);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(16px);
+}
+
+.sidebar {
+  border-radius: 28px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.brand-card h1,
+.hero-panel h2,
+.section-heading h2,
+.section-heading h3,
+.progress-header h4 {
+  margin: 0;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #87d8b3;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.76rem;
+}
+
+.muted,
+.player-select span,
+.history-head span,
+.progress-card p {
+  color: #a8b7be;
+}
+
+.helper-text {
+  margin: 0;
+  color: #87d8b3;
+  font-size: 0.92rem;
+}
+
+.warning-text {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 145, 145, 0.12);
+  border: 1px solid rgba(255, 145, 145, 0.28);
+  color: #ffc8c8;
+  font-size: 0.92rem;
+}
+
+.player-form,
+.players-panel,
+.main-panel,
+.dashboard-grid,
+.round-form,
+.history-list,
+.progress-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.player-form label,
+.field-row span,
+.stat-strip span {
+  font-size: 0.92rem;
+  color: #c9d7dc;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f5f8fa;
+  padding: 12px 14px;
+}
+
+button {
+  border-radius: 14px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #5cdaae 0%, #56b8ff 100%);
+  color: #0a1318;
+  font-weight: 700;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ghost-button {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f6f8;
+}
+
+.ghost-button.danger {
+  color: #ffb1b1;
+}
+
+.player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.player-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+}
+
+.player-card.selected {
+  border-color: rgba(92, 218, 174, 0.5);
+  background: rgba(92, 218, 174, 0.08);
+}
+
+.player-select {
+  background: transparent;
+  padding: 4px;
+  text-align: left;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero-panel {
+  border-radius: 28px;
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.map-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.map-tabs button {
+  background: rgba(255, 255, 255, 0.06);
+  color: #eff7f8;
+}
+
+.map-tabs .active {
+  background: linear-gradient(135deg, #5cdaae 0%, #56b8ff 100%);
+  color: #0d1318;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel {
+  border-radius: 26px;
+  padding: 22px;
+}
+
+.panel-accent {
+  background:
+    linear-gradient(180deg, rgba(89, 191, 255, 0.13), transparent),
+    rgba(10, 17, 21, 0.75);
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-heading span {
+  color: #88d5ff;
+}
+
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stat-strip div {
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-strip strong {
+  font-size: 1.35rem;
+}
+
+.round-form {
+  margin-top: 8px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 12px;
+  align-items: center;
+}
+
+.span-two {
+  grid-column: span 2;
+}
+
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.progress-card,
+.history-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.progress-header,
+.history-head,
+.history-items {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-header {
+  align-items: flex-start;
+}
+
+.progress-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+  margin: 12px 0 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.history-card,
+.history-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-head {
+  align-items: center;
+}
+
+.history-items {
+  color: #d3dde0;
+  gap: 8px;
+}
+
+.empty-state {
+  margin: 0;
+  color: #9db0b6;
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .span-two {
+    grid-column: auto;
+  }
+
+  .hero-panel {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell {
+    padding: 14px;
+  }
+
+  .sidebar,
+  .panel,
+  .hero-panel {
+    border-radius: 22px;
+  }
+
+  .inline-form,
+  .field-row,
+  .stat-strip {
+    grid-template-columns: 1fr;
+  }
+}

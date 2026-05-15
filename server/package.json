@@ -1,0 +1,19 @@
+{
+  "name": "farmtracks-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend scaffold for the FarmTracks app.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "build": "node -e \"console.log('server build: no-op')\""
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
