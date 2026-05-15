@@ -18,8 +18,14 @@ function normalizeHistory(history, items) {
   return history
     .filter((entry) => entry && typeof entry === "object")
     .map((entry, index) => {
-      const drops = items.reduce((accumulator, item) => {
-        const value = Number.parseInt(entry.drops?.[item.id] ?? 0, 10);
+      const gains = items.reduce((accumulator, item) => {
+        const value = Number.parseInt(entry.gains?.[item.id] ?? entry.drops?.[item.id] ?? 0, 10);
+        accumulator[item.id] = Number.isFinite(value) && value > 0 ? value : 0;
+        return accumulator;
+      }, {});
+
+      const snapshot = items.reduce((accumulator, item) => {
+        const value = Number.parseInt(entry.snapshot?.[item.id] ?? gains[item.id] ?? 0, 10);
         accumulator[item.id] = Number.isFinite(value) && value > 0 ? value : 0;
         return accumulator;
       }, {});
@@ -28,7 +34,8 @@ function normalizeHistory(history, items) {
         id: typeof entry.id === "string" ? entry.id : `history-${index}`,
         round: Number.isFinite(entry.round) && entry.round > 0 ? entry.round : index + 1,
         createdAt: typeof entry.createdAt === "string" ? entry.createdAt : new Date().toISOString(),
-        drops
+        gains,
+        snapshot
       };
     })
     .slice(0, 12);
@@ -80,10 +87,21 @@ function normalizePlayer(player, index) {
       totals[item.id] = Number.isFinite(value) && value > 0 ? value : 0;
     }
 
+    const currentSnapshot = createEmptyTotals(map.items);
+
+    for (const item of map.items) {
+      const value = Number.parseInt(
+        savedMap.currentSnapshot?.[item.id] ?? savedMap.totals?.[item.id] ?? 0,
+        10
+      );
+      currentSnapshot[item.id] = Number.isFinite(value) && value > 0 ? value : 0;
+    }
+
     accumulator[map.id] = {
       startedAt: typeof savedMap.startedAt === "string" ? savedMap.startedAt : emptyState.startedAt,
       rounds: Number.isFinite(savedMap.rounds) && savedMap.rounds > 0 ? savedMap.rounds : 0,
       totals,
+      currentSnapshot,
       history: normalizeHistory(savedMap.history, map.items),
       sessions: normalizeSessions(savedMap.sessions, map.items)
     };

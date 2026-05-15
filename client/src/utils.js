@@ -30,10 +30,13 @@ export function createEmptyTotals(items) {
 }
 
 export function createEmptyMapState(items) {
+  const emptyTotals = createEmptyTotals(items);
+
   return {
     startedAt: new Date().toISOString(),
     rounds: 0,
-    totals: createEmptyTotals(items),
+    totals: emptyTotals,
+    currentSnapshot: { ...emptyTotals },
     history: [],
     sessions: []
   };
@@ -55,18 +58,36 @@ export function createNewPlayer(name) {
 }
 
 export function normalizeRoundInput(map, values) {
-  const roundDrops = {};
+  const snapshotTotals = {};
 
   for (const item of map.items) {
-    const rawValue = values[item.id];
-    const parsedValue = Number.parseInt(rawValue ?? 0, 10);
-    roundDrops[item.id] = Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 0;
+    const stacksValue = Number.parseInt(values[item.id]?.stacks ?? 0, 10);
+    const looseValue = Number.parseInt(values[item.id]?.loose ?? 0, 10);
+    const stacks = Number.isFinite(stacksValue) && stacksValue > 0 ? stacksValue : 0;
+    const loose = Number.isFinite(looseValue) && looseValue > 0 ? looseValue : 0;
+
+    snapshotTotals[item.id] = (stacks * STACK_SIZE) + Math.min(loose, STACK_SIZE - 1);
   }
 
-  return roundDrops;
+  return snapshotTotals;
 }
 
-export function applyRound(player, mapId, roundDrops) {
+export function getRoundGains(previousSnapshot, nextSnapshot) {
+  return Object.keys(nextSnapshot).reduce((accumulator, itemId) => {
+    accumulator[itemId] = nextSnapshot[itemId] - (previousSnapshot[itemId] ?? 0);
+    return accumulator;
+  }, {});
+}
+
+export function hasPositiveGain(gains) {
+  return Object.values(gains).some((amount) => amount > 0);
+}
+
+export function hasNegativeGain(gains) {
+  return Object.values(gains).some((amount) => amount < 0);
+}
+
+export function applyRound(player, mapId, snapshotTotals) {
   const nextPlayer = structuredClone(player);
   const mapState = nextPlayer.maps[mapId];
 
@@ -74,19 +95,25 @@ export function applyRound(player, mapId, roundDrops) {
     return player;
   }
 
+  const previousSnapshot = mapState.currentSnapshot ?? createEmptyTotals(
+    Object.keys(snapshotTotals).map((itemId) => ({ id: itemId }))
+  );
+  const roundGains = getRoundGains(previousSnapshot, snapshotTotals);
   const nextTotals = { ...mapState.totals };
 
-  Object.entries(roundDrops).forEach(([itemId, amount]) => {
+  Object.entries(roundGains).forEach(([itemId, amount]) => {
     nextTotals[itemId] = (nextTotals[itemId] ?? 0) + amount;
   });
 
   mapState.rounds += 1;
   mapState.totals = nextTotals;
+  mapState.currentSnapshot = snapshotTotals;
   mapState.history = [
     {
       id: generateId(),
       round: mapState.rounds,
-      drops: roundDrops,
+      gains: roundGains,
+      snapshot: snapshotTotals,
       createdAt: new Date().toISOString()
     },
     ...mapState.history

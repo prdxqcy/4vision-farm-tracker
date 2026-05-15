@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { MAPS } from "./mapConfig";
+import { MAPS, STACK_SIZE } from "./mapConfig";
 import { loadPlayers, savePlayers } from "./storage";
 import {
   applyRound,
   createNewPlayer,
   finishSession,
+  getRoundGains,
   getStackProgress,
   getTotalItems,
-  hasDrops,
+  hasNegativeGain,
+  hasPositiveGain,
   normalizeRoundInput,
   resetMapProgress
 } from "./utils";
@@ -18,14 +20,59 @@ function formatDate(value) {
   return new Date(value).toLocaleString();
 }
 
+function splitAmount(total) {
+  return {
+    stacks: Math.floor(total / STACK_SIZE),
+    loose: total % STACK_SIZE
+  };
+}
+
+function buildInventoryInputs(map, snapshot = {}) {
+  return map.items.reduce((accumulator, item) => {
+    const amount = snapshot[item.id] ?? 0;
+    const split = splitAmount(amount);
+    accumulator[item.id] = {
+      stacks: String(split.stacks || ""),
+      loose: String(split.loose || "")
+    };
+    return accumulator;
+  }, {});
+}
+
+function RoundTrendChart({ history }) {
+  const points = [...history].reverse().map((entry) => getTotalItems(entry.gains));
+  const maxValue = Math.max(...points, 1);
+
+  if (points.length === 0) {
+    return <p className="empty-state">Round gains will chart here once you start capturing inventory snapshots.</p>;
+  }
+
+  return (
+    <div className="chart-shell">
+      <div className="chart-bars" aria-label="Round gain chart">
+        {points.map((value, index) => (
+          <div key={`${index}-${value}`} className="chart-column">
+            <div
+              className="chart-bar"
+              style={{ height: `${Math.max(14, (value / maxValue) * 100)}%` }}
+              title={`Round ${index + 1}: ${value} items`}
+            />
+            <span>R{index + 1}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [players, setPlayers] = useState(() => loadPlayers());
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedMapId, setSelectedMapId] = useState(DEFAULT_MAP_ID);
   const [newPlayerName, setNewPlayerName] = useState("");
-  const [roundValues, setRoundValues] = useState({});
+  const [inventoryInputs, setInventoryInputs] = useState({});
   const [storageError, setStorageError] = useState("");
-  const [roundFeedback, setRoundFeedback] = useState("");
+  const [formMessage, setFormMessage] = useState("");
   const [apiState, setApiState] = useState({
     loading: true,
     error: "",
@@ -44,6 +91,14 @@ function App() {
 
   const selectedSession = selectedPlayer?.maps[selectedMap.id] ?? null;
   const metadataMap = apiState.maps.find((map) => map.id === selectedMap.id);
+  const roundSnapshot = useMemo(
+    () => normalizeRoundInput(selectedMap, inventoryInputs),
+    [inventoryInputs, selectedMap]
+  );
+  const roundGains = useMemo(
+    () => getRoundGains(selectedSession?.currentSnapshot ?? {}, roundSnapshot),
+    [roundSnapshot, selectedSession]
+  );
 
   useEffect(() => {
     const error = savePlayers(players);
@@ -97,22 +152,16 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const nextValues = selectedMap.items.reduce((accumulator, item) => {
-      accumulator[item.id] = "";
-      return accumulator;
-    }, {});
-    setRoundValues(nextValues);
-    setRoundFeedback("");
-  }, [selectedMapId, selectedPlayerId]);
+    setInventoryInputs(buildInventoryInputs(selectedMap, selectedSession?.currentSnapshot));
+    setFormMessage("");
+  }, [selectedMapId, selectedPlayerId, selectedSession?.rounds]);
 
-  const roundDrops = useMemo(
-    () => normalizeRoundInput(selectedMap, roundValues),
-    [roundValues, selectedMap]
-  );
-
-  const hasRoundInput = hasDrops(roundDrops);
   const nextRoundNumber = (selectedSession?.rounds ?? 0) + 1;
-  const totalItemsInSession = getTotalItems(selectedSession?.totals ?? {});
+  const sessionTotal = getTotalItems(selectedSession?.totals ?? {});
+  const activeSnapshotTotal = getTotalItems(selectedSession?.currentSnapshot ?? {});
+  const projectedRoundGain = getTotalItems(
+    Object.fromEntries(Object.entries(roundGains).map(([itemId, value]) => [itemId, Math.max(0, value)]))
+  );
 
   function handleAddPlayer(event) {
     event.preventDefault();
@@ -127,42 +176,40 @@ function App() {
     setNewPlayerName("");
   }
 
-  function handleRoundValueChange(itemId, nextValue) {
-    setRoundValues((currentValues) => ({
-      ...currentValues,
-      [itemId]: nextValue
+  function handleInventoryChange(itemId, field, nextValue) {
+    setInventoryInputs((current) => ({
+      ...current,
+      [itemId]: {
+        ...current[itemId],
+        [field]: nextValue
+      }
     }));
-    setRoundFeedback("");
+    setFormMessage("");
   }
 
-  function clearRoundInputs() {
-    setRoundValues(
-      selectedMap.items.reduce((accumulator, item) => {
-        accumulator[item.id] = "";
-        return accumulator;
-      }, {})
-    );
-  }
-
-  function handleSaveRound(event) {
+  function handleCaptureRound(event) {
     event.preventDefault();
 
-    if (!selectedPlayer) {
+    if (!selectedPlayer || !selectedSession) {
       return;
     }
 
-    if (!hasRoundInput) {
-      setRoundFeedback("Enter at least one drop before saving the round.");
+    if (hasNegativeGain(roundGains)) {
+      setFormMessage("One or more item counts went backwards. If you banked items, finish the session first and start a new one.");
+      return;
+    }
+
+    if (!hasPositiveGain(roundGains)) {
+      setFormMessage("Update at least one item count before saving this round.");
       return;
     }
 
     setPlayers((currentPlayers) =>
       currentPlayers.map((player) =>
-        player.id === selectedPlayer.id ? applyRound(player, selectedMap.id, roundDrops) : player
+        player.id === selectedPlayer.id ? applyRound(player, selectedMap.id, roundSnapshot) : player
       )
     );
-    clearRoundInputs();
-    setRoundFeedback(`Round ${nextRoundNumber} saved to the active session.`);
+    setFormMessage(`Round ${nextRoundNumber} captured from the latest inventory snapshot.`);
   }
 
   function handleFinishSession() {
@@ -175,11 +222,10 @@ function App() {
         player.id === selectedPlayer.id ? finishSession(player, selectedMap.id, selectedMap.items) : player
       )
     );
-    clearRoundInputs();
-    setRoundFeedback(`Session finished for ${selectedPlayer.name} on ${selectedMap.name}.`);
+    setFormMessage(`Session finished for ${selectedPlayer.name}. A fresh session is ready.`);
   }
 
-  function handleClearSession() {
+  function handleResetSession() {
     if (!selectedPlayer) {
       return;
     }
@@ -191,8 +237,7 @@ function App() {
           : player
       )
     );
-    clearRoundInputs();
-    setRoundFeedback(`Current session cleared for ${selectedPlayer.name}.`);
+    setFormMessage(`Current session reset for ${selectedPlayer.name}.`);
   }
 
   function handleDeletePlayer(playerId) {
@@ -203,51 +248,48 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-mark">FT</div>
+          <div className="brand-badge">FT</div>
           <div>
-            <p className="caption">4Vision tracker</p>
+            <p className="caption">4Vision admin</p>
             <h1>FarmTracks</h1>
           </div>
         </div>
 
-        <form className="player-creator" onSubmit={handleAddPlayer}>
-          <label htmlFor="playerName">Add player</label>
-          <div className="input-row">
+        <form className="sidebar-form" onSubmit={handleAddPlayer}>
+          <label htmlFor="playerName">Create player</label>
+          <div className="sidebar-form-row">
             <input
               id="playerName"
               value={newPlayerName}
               onChange={(event) => setNewPlayerName(event.target.value)}
               placeholder="Player name"
             />
-            <button type="submit" className="primary-button">Create</button>
+            <button type="submit" className="primary-button">Add</button>
           </div>
         </form>
 
-        <section className="sidebar-section">
-          <div className="section-title-row">
+        <section className="sidebar-block">
+          <div className="section-row">
             <h2>Players</h2>
             <span>{players.length}</span>
           </div>
 
           {players.length === 0 ? (
-            <p className="empty-state">Create a player to start a farming session.</p>
+            <p className="empty-state">Create a player to begin tracking sessions.</p>
           ) : (
             <div className="player-list">
               {players.map((player) => {
-                const totalRounds = Object.values(player.maps).reduce(
-                  (sum, mapState) => sum + mapState.rounds,
-                  0
-                );
+                const liveRounds = Object.values(player.maps).reduce((sum, mapState) => sum + mapState.rounds, 0);
 
                 return (
                   <button
                     key={player.id}
                     type="button"
-                    className={`player-nav-item ${player.id === selectedPlayerId ? "active" : ""}`}
+                    className={`player-tile ${player.id === selectedPlayerId ? "active" : ""}`}
                     onClick={() => setSelectedPlayerId(player.id)}
                   >
                     <strong>{player.name}</strong>
-                    <span>{totalRounds} active rounds</span>
+                    <span>{liveRounds} live rounds</span>
                   </button>
                 );
               })}
@@ -261,10 +303,11 @@ function App() {
       <main className="content-shell">
         <header className="page-header">
           <div>
-            <p className="caption">Session tracking</p>
-            <h2>Round logging workspace</h2>
+            <p className="caption">Session operations</p>
+            <h2>Inventory checkpoint tracker</h2>
             <p className="subtle-text">
-              Enter what dropped each round. FarmTracks keeps a running session total until you finish.
+              Players do not need exact per-round drops. After each route, enter current stacks and loose items,
+              and FarmTracks calculates the round gain automatically.
             </p>
           </div>
 
@@ -273,28 +316,28 @@ function App() {
               <button
                 key={map.id}
                 type="button"
-                className={`map-chip ${map.id === selectedMapId ? "active" : ""}`}
+                className={`map-tile ${map.id === selectedMapId ? "active" : ""}`}
                 onClick={() => setSelectedMapId(map.id)}
               >
-                <span>{map.name}</span>
-                <small>{map.items.length} drops</small>
+                <strong>{map.name}</strong>
+                <span>{map.subtitle}</span>
               </button>
             ))}
           </div>
         </header>
 
         {!selectedPlayer ? (
-          <section className="panel empty-panel">
-            <h3>No player selected</h3>
-            <p className="subtle-text">Choose a player from the sidebar or create one to begin tracking rounds.</p>
+          <section className="panel">
+            <h3>Select a player</h3>
+            <p className="subtle-text">Use the left rail to choose a player before capturing any inventory checkpoints.</p>
           </section>
         ) : (
           <>
             <section className="panel session-panel">
-              <div className="session-panel-head">
+              <div className="session-header">
                 <div>
                   <p className="caption">Active session</p>
-                  <h3>{selectedPlayer.name} on {selectedMap.name}</h3>
+                  <h3>{selectedPlayer.name} · {selectedMap.name}</h3>
                   <p className="subtle-text">
                     {metadataMap?.notes ?? selectedMap.note}
                   </p>
@@ -309,8 +352,8 @@ function App() {
                   >
                     Finish session
                   </button>
-                  <button type="button" className="ghost-button" onClick={handleClearSession}>
-                    Clear current
+                  <button type="button" className="ghost-button" onClick={handleResetSession}>
+                    Reset session
                   </button>
                   <button
                     type="button"
@@ -324,152 +367,190 @@ function App() {
 
               <div className="stats-grid">
                 <article className="stat-card">
-                  <span>Current round</span>
+                  <span>Next round</span>
                   <strong>{nextRoundNumber}</strong>
-                  <small>Next round to save</small>
+                  <small>Checkpoint to capture</small>
                 </article>
                 <article className="stat-card">
                   <span>Session rounds</span>
                   <strong>{selectedSession?.rounds ?? 0}</strong>
-                  <small>Saved this session</small>
+                  <small>Rounds already captured</small>
                 </article>
                 <article className="stat-card">
-                  <span>Session items</span>
-                  <strong>{totalItemsInSession}</strong>
-                  <small>All drops combined</small>
+                  <span>Session total</span>
+                  <strong>{sessionTotal}</strong>
+                  <small>Items earned this session</small>
                 </article>
                 <article className="stat-card">
-                  <span>Completed sessions</span>
-                  <strong>{selectedSession?.sessions.length ?? 0}</strong>
-                  <small>Archived for this map</small>
+                  <span>Bag snapshot</span>
+                  <strong>{activeSnapshotTotal}</strong>
+                  <small>What the player holds now</small>
                 </article>
               </div>
 
-              <div className="session-workspace">
-                <form className="round-entry-card" onSubmit={handleSaveRound}>
-                  <div className="section-title-row">
+              <div className="workspace-grid">
+                <form className="panel inner-panel checkpoint-panel" onSubmit={handleCaptureRound}>
+                  <div className="section-row">
                     <div>
-                      <h3>Round {nextRoundNumber} input</h3>
-                      <p className="subtle-text">Enter only what dropped on this route loop.</p>
+                      <h3>Checkpoint input</h3>
+                      <p className="subtle-text">
+                        After each route, enter the current inventory state, not the guessed drop total.
+                      </p>
                     </div>
-                    <span className={`status-pill ${apiState.error ? "offline" : "ready"}`}>
+                    <span className={`status-pill ${apiState.error ? "offline" : ""}`}>
                       {apiState.loading ? "API loading" : apiState.error ? "API offline" : "API ready"}
                     </span>
                   </div>
 
-                  <div className="round-input-grid">
+                  <div className="checkpoint-grid">
                     {selectedMap.items.map((item) => (
-                      <label key={item.id} className="drop-input-card">
-                        <span className="drop-label">{item.name}</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={roundValues[item.id] ?? ""}
-                          onChange={(event) => handleRoundValueChange(item.id, event.target.value)}
-                          placeholder="0"
-                        />
-                      </label>
+                      <div key={item.id} className="checkpoint-card">
+                        <div className="checkpoint-copy">
+                          <strong>{item.name}</strong>
+                          <span>
+                            Current saved: {splitAmount(selectedSession?.currentSnapshot?.[item.id] ?? 0).stacks} stacks ·{" "}
+                            {splitAmount(selectedSession?.currentSnapshot?.[item.id] ?? 0).loose} loose
+                          </span>
+                        </div>
+                        <div className="checkpoint-fields">
+                          <label>
+                            <span>Stacks</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={inventoryInputs[item.id]?.stacks ?? ""}
+                              onChange={(event) => handleInventoryChange(item.id, "stacks", event.target.value)}
+                              placeholder="0"
+                            />
+                          </label>
+                          <label>
+                            <span>Loose</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max={STACK_SIZE - 1}
+                              step="1"
+                              value={inventoryInputs[item.id]?.loose ?? ""}
+                              onChange={(event) => handleInventoryChange(item.id, "loose", event.target.value)}
+                              placeholder="0"
+                            />
+                          </label>
+                        </div>
+                      </div>
                     ))}
                   </div>
 
-                  <div className="form-footer">
+                  <div className="capture-preview">
                     <div>
                       <p className="helper-text">
-                        {hasRoundInput
-                          ? `Round ${nextRoundNumber} will be added to the current session.`
-                          : "Enter at least one item amount to save the round."}
+                        {projectedRoundGain > 0
+                          ? `This checkpoint will add ${projectedRoundGain} items to round ${nextRoundNumber}.`
+                          : "Increase at least one item count to capture a new round."}
                       </p>
-                      {roundFeedback ? <p className="feedback-text">{roundFeedback}</p> : null}
+                      {formMessage ? <p className="feedback-text">{formMessage}</p> : null}
                     </div>
-                    <button type="submit" className="primary-button" disabled={!hasRoundInput}>
-                      Save round
+                    <button type="submit" className="primary-button" disabled={!hasPositiveGain(roundGains)}>
+                      Capture round
                     </button>
                   </div>
                 </form>
 
-                <article className="session-summary-card">
-                  <div className="section-title-row">
-                    <h3>Session totals</h3>
-                    <span>{selectedMap.items.length} items</span>
-                  </div>
-                  <p className="subtle-text">
-                    Started {selectedSession ? formatDate(selectedSession.startedAt) : "just now"}
-                  </p>
+                <div className="analytics-column">
+                  <article className="panel inner-panel">
+                    <div className="section-row">
+                      <h3>Round gain trend</h3>
+                      <span>Last 12</span>
+                    </div>
+                    <RoundTrendChart history={selectedSession?.history ?? []} />
+                  </article>
 
-                  <div className="totals-list">
-                    {selectedMap.items.map((item) => {
-                      const total = selectedSession?.totals[item.id] ?? 0;
-                      const progress = getStackProgress(total);
+                  <article className="panel inner-panel">
+                    <div className="section-row">
+                      <h3>Session totals</h3>
+                      <span>{selectedMap.items.length} tracked</span>
+                    </div>
+                    <div className="totals-list">
+                      {selectedMap.items.map((item) => {
+                        const total = selectedSession?.totals[item.id] ?? 0;
+                        const progress = getStackProgress(total);
 
-                      return (
-                        <div key={item.id} className="total-row">
-                          <div className="total-copy">
-                            <strong>{item.name}</strong>
-                            <span>{total} total</span>
-                          </div>
-                          <div className="total-progress">
+                        return (
+                          <div key={item.id} className="total-row">
+                            <div className="total-copy">
+                              <strong>{item.name}</strong>
+                              <span>{total} earned this session</span>
+                            </div>
+                            <div className="total-metric">
+                              <span>{progress.fullStacks} stacks</span>
+                              <small>{progress.remainder} / {STACK_SIZE}</small>
+                            </div>
                             <div className="progress-track">
                               <div
                                 className="progress-fill"
                                 style={{ width: `${progress.percent}%`, backgroundColor: item.color }}
                               />
                             </div>
-                            <span>{progress.fullStacks} stacks, {progress.remainder}/200</span>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </article>
+                        );
+                      })}
+                    </div>
+                  </article>
+                </div>
               </div>
             </section>
 
-            <section className="bottom-grid">
+            <section className="records-grid">
               <article className="panel">
-                <div className="section-title-row">
+                <div className="section-row">
                   <h3>Recent rounds</h3>
-                  <span>Latest 12</span>
+                  <span>Scrollable log</span>
                 </div>
-
                 {!selectedSession || selectedSession.history.length === 0 ? (
-                  <p className="empty-state">Saved rounds will appear here during the active session.</p>
+                  <p className="empty-state">Captured rounds will appear here.</p>
                 ) : (
-                  <div className="records-table">
-                    {selectedSession.history.map((entry) => (
-                      <div key={entry.id} className="record-row">
-                        <div className="record-meta">
-                          <strong>Round {entry.round}</strong>
-                          <span>{formatDate(entry.createdAt)}</span>
+                  <div className="scroll-region">
+                    <div className="records-list">
+                      {selectedSession.history.map((entry) => (
+                        <div key={entry.id} className="record-card">
+                          <div className="record-head">
+                            <div>
+                              <strong>Round {entry.round}</strong>
+                              <span>{formatDate(entry.createdAt)}</span>
+                            </div>
+                            <b>+{getTotalItems(entry.gains)}</b>
+                          </div>
+                          <div className="record-values">
+                            {selectedMap.items.map((item) => (
+                              <span key={item.id}>
+                                {item.name}: +{entry.gains[item.id] ?? 0}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                        <div className="record-values">
-                          {selectedMap.items.map((item) => (
-                            <span key={item.id}>
-                              {item.name}: {entry.drops[item.id] ?? 0}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
               </article>
 
               <article className="panel">
-                <div className="section-title-row">
+                <div className="section-row">
                   <h3>Finished sessions</h3>
-                  <span>Latest 8</span>
+                  <span>Archive</span>
                 </div>
-
                 {!selectedSession || selectedSession.sessions.length === 0 ? (
-                  <p className="empty-state">Finish a session to archive its totals here.</p>
+                  <p className="empty-state">Finish a session to archive totals here.</p>
                 ) : (
-                  <div className="records-table">
+                  <div className="records-list">
                     {selectedSession.sessions.map((session) => (
-                      <div key={session.id} className="record-row">
-                        <div className="record-meta">
-                          <strong>{session.rounds} rounds</strong>
-                          <span>{formatDate(session.finishedAt)}</span>
+                      <div key={session.id} className="record-card">
+                        <div className="record-head">
+                          <div>
+                            <strong>{session.rounds} rounds</strong>
+                            <span>{formatDate(session.finishedAt)}</span>
+                          </div>
+                          <b>{getTotalItems(session.totals)} total</b>
                         </div>
                         <div className="record-values">
                           {selectedMap.items.map((item) => (
