@@ -433,6 +433,25 @@ function detectBagScanRegion(sourceCanvas) {
   };
 }
 
+function getMatchBounds(matches) {
+  if (!matches.length) {
+    return null;
+  }
+
+  const minX = Math.min(...matches.map((match) => match.slotX));
+  const minY = Math.min(...matches.map((match) => match.slotY));
+  const maxX = Math.max(...matches.map((match) => match.slotX + match.slotSize));
+  const maxY = Math.max(...matches.map((match) => match.slotY + match.slotSize));
+  const padding = 52;
+
+  return {
+    x: Math.max(0, minX - padding),
+    y: Math.max(0, minY - padding),
+    width: (maxX - minX) + (padding * 2),
+    height: (maxY - minY) + (padding * 2)
+  };
+}
+
 function preprocessDigits(slotCanvas, variant) {
   const sourceWidth = slotCanvas.width;
   const sourceHeight = slotCanvas.height;
@@ -664,20 +683,59 @@ export async function captureDesktopScreenshot(options = {}) {
   return window.farmtracksDesktop.captureScreen(options);
 }
 
+async function detectDesktopAutoCapture(profile, options = {}) {
+  if (!window.farmtracksDesktop?.detectAutoCapture) {
+    return null;
+  }
+
+  return window.farmtracksDesktop.detectAutoCapture(profile, options);
+}
+
 export async function scanNarwashiScreen(profile, options = {}) {
   if (!profile?.items?.length) {
     throw new Error("Complete auto-capture calibration before scanning.");
   }
 
-  const screenshotDataUrl = await captureDesktopScreenshot(options);
+  const desktopDetection = await detectDesktopAutoCapture(profile, options);
+  const screenshotDataUrl = desktopDetection?.screenshotDataUrl ?? await captureDesktopScreenshot(options);
   const fullScreenCanvas = await createCanvasFromImage(screenshotDataUrl);
-  const detectedScanRegion = detectBagScanRegion(fullScreenCanvas);
-  const screenCanvas = cropCanvasRegion(fullScreenCanvas, detectedScanRegion ?? profile.scanRegion);
-  const allMatches = [];
+  let detectedScanRegion = null;
+  let allMatches = [];
+  let provider = "js-fallback";
 
-  for (const item of profile.items) {
-    const matches = await findTemplateMatches(screenCanvas, item);
-    allMatches.push(...matches);
+  if (desktopDetection?.provider === "autohotkey" && Array.isArray(desktopDetection.matches) && desktopDetection.matches.length > 0) {
+    provider = "autohotkey";
+    allMatches = dedupeMatches(
+      desktopDetection.matches.map((match) => ({
+        itemId: match.itemId,
+        x: match.x,
+        y: match.y,
+        score: 0,
+        featureDistance: 0,
+        scale: match.scale ?? 1,
+        slotX: match.x,
+        slotY: match.y,
+        slotSize: match.slotSize || TEMPLATE_SIZE
+      }))
+    );
+    detectedScanRegion = getMatchBounds(allMatches);
+  } else {
+    detectedScanRegion = detectBagScanRegion(fullScreenCanvas);
+    const activeRegion = detectedScanRegion ?? profile.scanRegion ?? { x: 0, y: 0 };
+    const screenCanvas = cropCanvasRegion(fullScreenCanvas, detectedScanRegion ?? profile.scanRegion);
+
+    for (const item of profile.items) {
+      const matches = await findTemplateMatches(screenCanvas, item);
+      allMatches.push(
+        ...matches.map((match) => ({
+          ...match,
+          x: match.x + activeRegion.x,
+          y: match.y + activeRegion.y,
+          slotX: match.slotX + activeRegion.x,
+          slotY: match.slotY + activeRegion.y
+        }))
+      );
+    }
   }
 
   const snapshot = {
@@ -694,12 +752,21 @@ export async function scanNarwashiScreen(profile, options = {}) {
       .sort((left, right) => getMatchQuality(left) - getMatchQuality(right));
 
     if (item.countMode === "best-stack") {
-      const bestMatch = itemMatches[0];
+      let bestMatch = null;
+      let bestCount = 0;
+
+      for (const candidate of itemMatches) {
+        const count = await extractCountFromSlot(fullScreenCanvas, candidate);
+
+        if (count >= bestCount) {
+          bestCount = count;
+          bestMatch = { ...candidate, count };
+        }
+      }
 
       if (bestMatch) {
-        const count = await extractCountFromSlot(screenCanvas, bestMatch);
-        snapshot[item.id] = count;
-        detailedMatches.push({ ...bestMatch, count });
+        snapshot[item.id] = bestMatch.count;
+        detailedMatches.push(bestMatch);
       }
 
       continue;
@@ -714,6 +781,7 @@ export async function scanNarwashiScreen(profile, options = {}) {
 
   return {
     screenshotDataUrl,
+    provider,
     scanRegion: detectedScanRegion ?? profile.scanRegion ?? null,
     matches: detailedMatches,
     snapshot

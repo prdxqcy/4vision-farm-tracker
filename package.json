@@ -1,7 +1,7 @@
 {
   "name": "farmtracks",
   "private": true,
-  "version": "1.0.14",
+  "version": "1.0.15",
   "main": "desktop/main.cjs",
   "workspaces": [
     "client",
@@ -47,7 +47,8 @@
     ],
     "asar": true,
     "asarUnpack": [
-      "node_modules/screenshot-desktop/lib/win32/**/*"
+      "node_modules/screenshot-desktop/lib/win32/**/*",
+      "desktop/ahk/**/*"
     ],
     "protocols": [
       {

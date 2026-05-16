@@ -1,5 +1,8 @@
 const path = require("path");
-const { app, BrowserWindow, ipcMain, screen } = require("electron");
+const fs = require("fs/promises");
+const os = require("os");
+const { execFile } = require("child_process");
+const { app, BrowserWindow, ipcMain, nativeImage, screen } = require("electron");
 const screenshot = require("screenshot-desktop");
 
 const OVERLAY_QUERY = "capture-overlay";
@@ -12,6 +15,7 @@ let localServer = null;
 let mainWindow = null;
 let overlayWindow = null;
 let pendingOverlayOptions = {};
+let cachedAutoHotkeyPath = undefined;
 
 const singleInstanceLock = app.requestSingleInstanceLock();
 
@@ -88,6 +92,176 @@ function sharedWebPreferences() {
     nodeIntegration: false,
     spellcheck: false
   };
+}
+
+function getAutoHotkeyScriptPath() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "app.asar.unpacked", "desktop", "ahk", "find-matches.ahk");
+  }
+
+  return path.join(__dirname, "ahk", "find-matches.ahk");
+}
+
+async function fileExists(targetPath) {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function findAutoHotkeyPath() {
+  if (cachedAutoHotkeyPath !== undefined) {
+    return cachedAutoHotkeyPath;
+  }
+
+  const candidates = [
+    path.join(process.env.ProgramFiles || "", "AutoHotkey", "v2", "AutoHotkey64.exe"),
+    path.join(process.env.ProgramFiles || "", "AutoHotkey", "AutoHotkey64.exe"),
+    path.join(process.env.ProgramFiles || "", "AutoHotkey", "AutoHotkey.exe"),
+    path.join(process.env["ProgramFiles(x86)"] || "", "AutoHotkey", "AutoHotkey64.exe"),
+    path.join(process.env["ProgramFiles(x86)"] || "", "AutoHotkey", "AutoHotkey.exe")
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) {
+      cachedAutoHotkeyPath = candidate;
+      return candidate;
+    }
+  }
+
+  cachedAutoHotkeyPath = null;
+  return null;
+}
+
+function buildAhkConfig(profile) {
+  const displayBounds = screen.getPrimaryDisplay().bounds;
+  const lines = [
+    [
+      "bounds",
+      displayBounds.x,
+      displayBounds.y,
+      displayBounds.x + displayBounds.width,
+      displayBounds.y + displayBounds.height,
+      72,
+      22,
+      20
+    ].join("|")
+  ];
+
+  for (const item of profile?.items ?? []) {
+    if (!item?.templateDataUrl || !item?.itemId) {
+      continue;
+    }
+
+    const maxMatches = item.itemId === "crystals" ? 10 : 4;
+    const variation = item.itemId === "crystals" ? 42 : 34;
+    lines.push(`${item.itemId}|__TEMPLATE__|__SLOT_SIZE__|${maxMatches}|${variation}|__SCALE__`);
+  }
+
+  return lines;
+}
+
+async function writeAhkTemplates(tempDir, profile) {
+  const templateEntries = [];
+  const scales = [0.88, 0.94, 1, 1.06, 1.12];
+
+  for (const item of profile?.items ?? []) {
+    if (!item?.templateDataUrl || !item?.itemId) {
+      continue;
+    }
+
+    const baseImage = nativeImage.createFromDataURL(item.templateDataUrl);
+
+    for (const scale of scales) {
+      const width = Math.max(18, Math.round(baseImage.getSize().width * scale));
+      const height = Math.max(18, Math.round(baseImage.getSize().height * scale));
+      const image = scale === 1 ? baseImage : baseImage.resize({ width, height, quality: "best" });
+      const templatePath = path.join(tempDir, `${item.itemId}-${String(scale).replace(".", "_")}.png`);
+      await fs.writeFile(templatePath, image.toPNG());
+      templateEntries.push({
+        itemId: item.itemId,
+        path: templatePath,
+        slotSize: width,
+        scale
+      });
+    }
+  }
+
+  return templateEntries;
+}
+
+async function runAutoHotkeyDetector(profile) {
+  const autoHotkeyPath = await findAutoHotkeyPath();
+  const scriptPath = getAutoHotkeyScriptPath();
+
+  if (!autoHotkeyPath || !(await fileExists(scriptPath))) {
+    return {
+      available: false,
+      provider: "js-fallback",
+      matches: []
+    };
+  }
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "farmtracks-ahk-"));
+
+  try {
+    const configLines = buildAhkConfig(profile);
+    const templateEntries = await writeAhkTemplates(tempDir, profile);
+    const inputPath = path.join(tempDir, "input.txt");
+    const outputPath = path.join(tempDir, "output.txt");
+
+    const entryLines = templateEntries.map((entry) => {
+      const templateLine = configLines.find((line) => line.startsWith(`${entry.itemId}|`));
+      return templateLine
+        .replace("__TEMPLATE__", entry.path)
+        .replace("__SLOT_SIZE__", String(entry.slotSize))
+        .replace("__SCALE__", String(entry.scale));
+    });
+
+    await fs.writeFile(inputPath, [configLines[0], ...entryLines].join("\n"), "utf8");
+
+    await new Promise((resolve, reject) => {
+      execFile(autoHotkeyPath, [scriptPath, inputPath, outputPath], { windowsHide: true, timeout: 15000 }, (error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+
+    const rawOutput = await fs.readFile(outputPath, "utf8");
+    const lines = rawOutput.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const matches = [];
+
+    for (const line of lines.slice(1)) {
+      const [itemId, x, y, slotSize, scale] = line.split("|");
+      matches.push({
+        itemId,
+        x: Number.parseInt(x, 10),
+        y: Number.parseInt(y, 10),
+        slotSize: Number.parseInt(slotSize, 10),
+        scale: Number.parseFloat(scale) || 1
+      });
+    }
+
+    return {
+      available: true,
+      provider: "autohotkey",
+      matches
+    };
+  } catch (_error) {
+    return {
+      available: false,
+      provider: "js-fallback",
+      matches: []
+    };
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
 }
 
 function registerProtocolClient() {
@@ -202,6 +376,33 @@ ipcMain.handle("farmtracks:capture-screen", async (event, options = {}) => {
   }
 
   return `data:image/png;base64,${image.toString("base64")}`;
+});
+
+ipcMain.handle("farmtracks:detect-auto-capture", async (event, profile, options = {}) => {
+  const currentWindow = BrowserWindow.fromWebContents(event.sender);
+
+  if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {
+    currentWindow.hide();
+    await new Promise((resolve) => setTimeout(resolve, 180));
+  }
+
+  try {
+    const [image, detection] = await Promise.all([
+      screenshot({ format: "png" }),
+      runAutoHotkeyDetector(profile)
+    ]);
+
+    return {
+      screenshotDataUrl: `data:image/png;base64,${image.toString("base64")}`,
+      provider: detection.provider,
+      matches: detection.matches
+    };
+  } finally {
+    if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {
+      currentWindow.show();
+      currentWindow.focus();
+    }
+  }
 });
 
 ipcMain.handle("farmtracks:close-window", (event) => {

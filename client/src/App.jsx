@@ -156,8 +156,7 @@ function OverlayAccessPanel({ guideMode, installerUrl, isDesktopShell, mapName, 
       steps: [
         `Your browser is asking Windows to open the FarmTracks Overlay app for ${mapName}.`,
         "If Windows shows an 'Open FarmTracks Overlay' prompt, approve it to continue.",
-        "If nothing opens, install the overlay app first and launch it once manually so Windows registers the farmtracks:// link handler.",
-        "Run your game in borderless windowed mode for the always-on-top overlay to stay visible."
+        "If nothing opens, install the overlay app first and launch it once manually so Windows registers the farmtracks:// link handler."
       ]
     },
     desktop: {
@@ -166,7 +165,6 @@ function OverlayAccessPanel({ guideMode, installerUrl, isDesktopShell, mapName, 
       steps: [
         `Press Open Overlay to launch the always-on-top panel for ${mapName}.`,
         "Drag the overlay by its header and keep it near your game HUD.",
-        "Use borderless windowed mode in-game for the most reliable overlay behavior.",
         "Close the overlay window any time and reopen it from this page."
       ]
     }
@@ -252,7 +250,7 @@ function WelcomeGuideModal({
     "Auto-capture round reads the bags and records the round immediately when the values increased.",
     "Overlay guide.",
     "The installed desktop app gives you the best overlay experience and opens a native always-on-top window beside the game.",
-    "For the smoothest overlay, run the game in borderless windowed mode and keep your bags visible during auto-capture.",
+    "Keep your bags visible during auto-capture for the best detection results.",
     `Current route: ${mapName}.`
   ].join(" ");
 
@@ -341,7 +339,6 @@ function WelcomeGuideModal({
               overlay, better screen capture support, and the smoothest in-game workflow.
             </p>
             <ul className="welcome-guide-list">
-              <li>Run the game in borderless windowed mode.</li>
               <li>Keep bags visible while scanning.</li>
               <li>Open the overlay beside your game HUD and leave the dashboard in the background.</li>
             </ul>
@@ -370,7 +367,8 @@ function AutoCapturePanel({
           <h2>Read tracked items from the game screen</h2>
           <p className="subtle-text">
             Calibrate once by clicking a crystal, arcane, and speed potion on a live screenshot. FarmTracks will then
-            scan visible bags anywhere on screen and fill the current inventory totals automatically.
+            scan visible bags anywhere on screen and fill the current inventory totals automatically. The desktop app
+            now tries AutoHotkey image matching first when it is installed.
           </p>
         </div>
         <div className="auto-capture-actions">
@@ -1022,7 +1020,8 @@ function App() {
       const result = await scanNarwashiScreen(autoCaptureProfile, { hideCurrentWindow: true });
       const mergedSnapshot = mergeWithCurrentSnapshot(selectedMap, selectedSession?.currentSnapshot, result.snapshot);
       const mergedResult = { ...result, snapshot: mergedSnapshot };
-      const summary = `Detected ${mergedSnapshot.crystals} crystals, ${mergedSnapshot.arcanes} arcanes, and ${mergedSnapshot["speed-potions"]} speed potions from ${result.matches.length} matched slots.`;
+      const providerLabel = result.provider === "autohotkey" ? "using AutoHotkey image matching" : "using the built-in scanner";
+      const summary = `Detected ${mergedSnapshot.crystals} crystals, ${mergedSnapshot.arcanes} arcanes, and ${mergedSnapshot["speed-potions"]} speed potions from ${result.matches.length} matched slots ${providerLabel}.`;
 
       setAutoCaptureResult(mergedResult);
       setInventoryInputs(buildInventoryInputs(selectedMap, mergedSnapshot));
