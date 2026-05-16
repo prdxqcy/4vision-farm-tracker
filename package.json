@@ -31,6 +31,7 @@
   "build": {
     "appId": "com.vision4.farmtracks",
     "productName": "FarmTracks Overlay",
+    "artifactName": "FarmTracks-Overlay-Setup.${ext}",
     "directories": {
       "output": "release"
     },

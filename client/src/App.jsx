@@ -16,7 +16,7 @@ import {
 
 const DEFAULT_MAP_ID = MAPS[0].id;
 const INVENTORY_POPOUT_QUERY = "capture-overlay";
-const DEFAULT_OVERLAY_INSTALLER_URL = "/downloads/FarmTracks-Overlay-Setup.exe";
+const DEFAULT_OVERLAY_INSTALLER_URL = "https://github.com/prdxqcy/4vision-farm-tracker/releases/latest/download/FarmTracks-Overlay-Setup.exe";
 const OVERLAY_INSTALLER_URL = import.meta.env.VITE_OVERLAY_INSTALLER_URL || DEFAULT_OVERLAY_INSTALLER_URL;
 const OVERLAY_PROTOCOL = "farmtracks://open-overlay";
 

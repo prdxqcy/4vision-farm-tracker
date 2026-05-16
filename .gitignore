@@ -4,3 +4,4 @@ npm-debug.log*
 dist/
 client/dist/
 release/
+client/public/downloads/*.exe
