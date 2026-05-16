@@ -12,6 +12,8 @@ const BASE_MATCH_THRESHOLD = 0.19;
 const FEATURE_MATCH_THRESHOLD = 0.28;
 const DUPLICATE_DISTANCE = 20;
 const MAX_SLOT_COUNT = 199;
+const SLOT_SCAN_STEP = 8;
+const SLOT_CANDIDATE_SIZES = [26, 30, 34, 38];
 let ocrWorkerPromise = null;
 
 export const NARWASHI_AUTO_CAPTURE_ITEMS = [
@@ -344,6 +346,93 @@ function cropCanvasRegion(sourceCanvas, region) {
   return croppedCanvas;
 }
 
+function getPixelAverage(data, imageWidth, x, y, width, height, step = 4) {
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let count = 0;
+
+  for (let sampleY = y; sampleY < y + height; sampleY += step) {
+    for (let sampleX = x; sampleX < x + width; sampleX += step) {
+      const index = (sampleY * imageWidth + sampleX) * 4;
+      red += data[index];
+      green += data[index + 1];
+      blue += data[index + 2];
+      count += 1;
+    }
+  }
+
+  if (count === 0) {
+    return [255, 255, 255];
+  }
+
+  return [red / count, green / count, blue / count];
+}
+
+function isLikelyEmptySlot(data, imageWidth, x, y, size) {
+  const inset = Math.max(5, Math.round(size * 0.22));
+  const [red, green, blue] = getPixelAverage(
+    data,
+    imageWidth,
+    x + inset,
+    y + inset,
+    size - (inset * 2),
+    size - (inset * 2)
+  );
+  const brightness = (red + green + blue) / 3;
+  return brightness < 38;
+}
+
+function hasGridNeighbor(candidate, candidates) {
+  const expectedGap = candidate.size + 4;
+  return candidates.some((other) => {
+    if (other === candidate) {
+      return false;
+    }
+
+    const dx = Math.abs(other.x - candidate.x);
+    const dy = Math.abs(other.y - candidate.y);
+    const sameColumn = dx <= 8 && Math.abs(dy - expectedGap) <= 10;
+    const sameRow = dy <= 8 && Math.abs(dx - expectedGap) <= 10;
+    return sameColumn || sameRow;
+  });
+}
+
+function detectBagScanRegion(sourceCanvas) {
+  const context = sourceCanvas.getContext("2d", { willReadFrequently: true });
+  const imageData = context.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+  const candidates = [];
+
+  for (const size of SLOT_CANDIDATE_SIZES) {
+    for (let y = 0; y <= sourceCanvas.height - size; y += SLOT_SCAN_STEP) {
+      for (let x = 0; x <= sourceCanvas.width - size; x += SLOT_SCAN_STEP) {
+        if (isLikelyEmptySlot(imageData.data, sourceCanvas.width, x, y, size)) {
+          candidates.push({ x, y, size });
+        }
+      }
+    }
+  }
+
+  const gridCandidates = candidates.filter((candidate) => hasGridNeighbor(candidate, candidates));
+
+  if (gridCandidates.length < 4) {
+    return null;
+  }
+
+  const minX = Math.min(...gridCandidates.map((candidate) => candidate.x));
+  const minY = Math.min(...gridCandidates.map((candidate) => candidate.y));
+  const maxX = Math.max(...gridCandidates.map((candidate) => candidate.x + candidate.size));
+  const maxY = Math.max(...gridCandidates.map((candidate) => candidate.y + candidate.size));
+  const padding = 52;
+
+  return {
+    x: clamp(minX - padding, 0, sourceCanvas.width - 1),
+    y: clamp(minY - padding, 0, sourceCanvas.height - 1),
+    width: clamp((maxX - minX) + (padding * 2), 1, sourceCanvas.width - Math.max(0, minX - padding)),
+    height: clamp((maxY - minY) + (padding * 2), 1, sourceCanvas.height - Math.max(0, minY - padding))
+  };
+}
+
 function preprocessDigits(slotCanvas, variant) {
   const sourceWidth = slotCanvas.width;
   const sourceHeight = slotCanvas.height;
@@ -582,7 +671,8 @@ export async function scanNarwashiScreen(profile, options = {}) {
 
   const screenshotDataUrl = await captureDesktopScreenshot(options);
   const fullScreenCanvas = await createCanvasFromImage(screenshotDataUrl);
-  const screenCanvas = cropCanvasRegion(fullScreenCanvas, profile.scanRegion);
+  const detectedScanRegion = detectBagScanRegion(fullScreenCanvas);
+  const screenCanvas = cropCanvasRegion(fullScreenCanvas, detectedScanRegion ?? profile.scanRegion);
   const allMatches = [];
 
   for (const item of profile.items) {
@@ -624,6 +714,7 @@ export async function scanNarwashiScreen(profile, options = {}) {
 
   return {
     screenshotDataUrl,
+    scanRegion: detectedScanRegion ?? profile.scanRegion ?? null,
     matches: detailedMatches,
     snapshot
   };

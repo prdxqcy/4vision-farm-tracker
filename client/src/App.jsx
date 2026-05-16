@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   NARWASHI_AUTO_CAPTURE_ITEMS,
   captureDesktopScreenshot,
@@ -278,10 +278,7 @@ function AutoCapturePanel({
   );
 }
 
-function AutoCaptureCalibrationModal({ session, onCancel, onRegionChange, onRetake, onSelect }) {
-  const [dragStart, setDragStart] = useState(null);
-  const [draftRegion, setDraftRegion] = useState(null);
-  const suppressNextClickRef = useRef(false);
+function AutoCaptureCalibrationModal({ session, onCancel, onRetake, onSelect }) {
   const nextItem = NARWASHI_AUTO_CAPTURE_ITEMS[session.selections.length];
 
   function getImagePoint(event) {
@@ -294,65 +291,10 @@ function AutoCaptureCalibrationModal({ session, onCancel, onRegionChange, onReta
     };
   }
 
-  function createRegion(startPoint, endPoint) {
-    const x = Math.min(startPoint.x, endPoint.x);
-    const y = Math.min(startPoint.y, endPoint.y);
-    return {
-      x,
-      y,
-      width: Math.abs(endPoint.x - startPoint.x),
-      height: Math.abs(endPoint.y - startPoint.y)
-    };
-  }
-
-  function handlePointerDown(event) {
-    if (session.scanRegion) {
-      return;
-    }
-
-    const point = getImagePoint(event);
-    setDragStart(point);
-    setDraftRegion({ x: point.x, y: point.y, width: 0, height: 0 });
-  }
-
-  function handlePointerMove(event) {
-    if (!dragStart || session.scanRegion) {
-      return;
-    }
-
-    setDraftRegion(createRegion(dragStart, getImagePoint(event)));
-  }
-
-  function handlePointerUp(event) {
-    if (!dragStart || session.scanRegion) {
-      return;
-    }
-
-    const nextRegion = createRegion(dragStart, getImagePoint(event));
-    setDragStart(null);
-    setDraftRegion(null);
-
-    if (nextRegion.width >= 80 && nextRegion.height >= 80) {
-      suppressNextClickRef.current = true;
-      onRegionChange(nextRegion);
-    }
-  }
-
   function handleImageClick(event) {
-    if (suppressNextClickRef.current) {
-      suppressNextClickRef.current = false;
-      return;
-    }
-
-    if (!session.scanRegion || dragStart) {
-      return;
-    }
-
     const { x, y } = getImagePoint(event);
     onSelect({ itemId: nextItem.id, x, y });
   }
-
-  const activeRegion = session.scanRegion ?? draftRegion;
 
   return (
     <div className="auto-capture-modal-backdrop" role="dialog" aria-modal="true">
@@ -360,11 +302,10 @@ function AutoCaptureCalibrationModal({ session, onCancel, onRegionChange, onReta
         <div className="panel-header">
           <div>
             <p className="eyebrow">Calibration</p>
-            <h2>{session.scanRegion ? `Click the ${nextItem.name} icon` : "Select the bag area"}</h2>
+            <h2>Click the {nextItem.name} icon</h2>
             <p className="subtle-text">
-              {session.scanRegion
-                ? `Click the center of one visible ${nextItem.shortName.toLowerCase()} slot inside the selected bags.`
-                : "Drag a rectangle around only your open bags so scans ignore the rest of the screen."}
+              Click the center of one visible {nextItem.shortName.toLowerCase()} slot. FarmTracks will find the open
+              bag grids automatically when scanning.
             </p>
           </div>
           <div className="auto-capture-actions">
@@ -393,22 +334,8 @@ function AutoCaptureCalibrationModal({ session, onCancel, onRegionChange, onReta
             src={session.screenshotDataUrl}
             alt="Game screenshot for auto-capture calibration"
             className="auto-capture-image"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
             onClick={handleImageClick}
           />
-          {activeRegion ? (
-            <span
-              className="auto-capture-region"
-              style={{
-                left: `${(activeRegion.x / session.imageWidth) * 100}%`,
-                top: `${(activeRegion.y / session.imageHeight) * 100}%`,
-                width: `${(activeRegion.width / session.imageWidth) * 100}%`,
-                height: `${(activeRegion.height / session.imageHeight) * 100}%`
-              }}
-            />
-          ) : null}
           {session.selections.map((selection, index) => (
             <span
               key={`${selection.itemId}-${index}`}
@@ -870,7 +797,6 @@ function App() {
         screenshotDataUrl,
         imageWidth: screenshotImage.width,
         imageHeight: screenshotImage.height,
-        scanRegion: null,
         selections: []
       });
     } catch (error) {
@@ -884,20 +810,8 @@ function App() {
     await handleStartAutoCaptureCalibration();
   }
 
-  function handleSetCalibrationRegion(scanRegion) {
-    if (!calibrationSession) {
-      return;
-    }
-
-    setCalibrationSession({
-      ...calibrationSession,
-      scanRegion,
-      selections: []
-    });
-  }
-
   async function handleSelectCalibrationPoint(selection) {
-    if (!calibrationSession?.scanRegion) {
+    if (!calibrationSession) {
       return;
     }
 
@@ -916,7 +830,6 @@ function App() {
     try {
       const nextProfile = await createNarwashiAutoCaptureProfile({
         screenshotDataUrl: calibrationSession.screenshotDataUrl,
-        scanRegion: calibrationSession.scanRegion,
         selections: nextSelections
       });
 
@@ -1053,7 +966,6 @@ function App() {
           <AutoCaptureCalibrationModal
             session={calibrationSession}
             onCancel={() => setCalibrationSession(null)}
-            onRegionChange={handleSetCalibrationRegion}
             onRetake={handleRetakeAutoCaptureCalibration}
             onSelect={handleSelectCalibrationPoint}
           />
@@ -1367,7 +1279,6 @@ function App() {
         <AutoCaptureCalibrationModal
           session={calibrationSession}
           onCancel={() => setCalibrationSession(null)}
-          onRegionChange={handleSetCalibrationRegion}
           onRetake={handleRetakeAutoCaptureCalibration}
           onSelect={handleSelectCalibrationPoint}
         />
