@@ -630,7 +630,7 @@ function App() {
     : 0;
   const mapSnapshot = splitAmount(activeSnapshotTotal);
   const isDesktopShell = isDesktopShellAvailable();
-  const isNarwashiAutoCaptureAvailable = isDesktopShell && selectedMap.id === "narwashi" && !isOverlayMode;
+  const isNarwashiAutoCaptureAvailable = isDesktopShell && selectedMap.id === "narwashi";
 
   function handleInventoryChange(itemId, field, nextValue) {
     setInventoryInputs((current) => ({
@@ -774,7 +774,7 @@ function App() {
     setAutoCaptureMessage("");
 
     try {
-      const screenshotDataUrl = await captureDesktopScreenshot();
+      const screenshotDataUrl = await captureDesktopScreenshot({ hideCurrentWindow: true });
       const screenshotImage = new Image();
       screenshotImage.src = screenshotDataUrl;
       await screenshotImage.decode();
@@ -842,7 +842,7 @@ function App() {
     setAutoCaptureMessage("");
 
     try {
-      const result = await scanNarwashiScreen(autoCaptureProfile);
+      const result = await scanNarwashiScreen(autoCaptureProfile, { hideCurrentWindow: true });
       const summary = `Detected ${result.snapshot.crystals} crystals, ${result.snapshot.arcanes} arcanes, and ${result.snapshot["speed-potions"]} speed potions from ${result.matches.length} matched slots.`;
 
       setAutoCaptureResult(result);
@@ -863,75 +863,98 @@ function App() {
 
   if (isOverlayMode) {
     return (
-      <main className="overlay-shell">
-        <section className="overlay-header page-panel">
-          <div className="overlay-drag-surface">
-            <p className="eyebrow">FarmTracks Overlay</p>
-            <h1>{selectedMap.name} Capture</h1>
-            <div className="overlay-drag-handle" aria-hidden="true">
-              <span className="overlay-drag-grip" />
-              <span className="overlay-drag-label">Drag to move overlay</span>
+      <>
+        <main className="overlay-shell">
+          <section className="overlay-header page-panel">
+            <div className="overlay-drag-surface">
+              <p className="eyebrow">FarmTracks Overlay</p>
+              <h1>{selectedMap.name} Capture</h1>
+              <div className="overlay-drag-handle" aria-hidden="true">
+                <span className="overlay-drag-grip" />
+                <span className="overlay-drag-label">Drag to move overlay</span>
+              </div>
             </div>
-          </div>
-          <OverlayWindowControls
-            onClose={handleCloseOverlay}
-            onOpenDashboard={handleOpenMainWindow}
-            onOpacityChange={handleOverlayOpacityChange}
-            opacityValue={overlayOpacity}
-            showDashboardButton={isDesktopShell}
-          />
-        </section>
-
-        {selectedPlayer ? (
-          <>
-            <section className="overlay-map-switcher page-panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Route</h2>
-                  <p className="subtle-text">Switch the active farming route without touching the main window.</p>
-                </div>
-              </div>
-              <div className="sidebar-map-list overlay-map-list" role="tablist" aria-label="Map selector">
-                {MAPS.map((map) => (
-                  <button
-                    key={map.id}
-                    type="button"
-                    className={`sidebar-map-item ${map.id === selectedMapId ? "active" : ""}`}
-                    onClick={() => setSelectedMapId(map.id)}
-                  >
-                    <strong>{map.name}</strong>
-                    <span>{map.subtitle}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <CapturePanel
-              formMessage={formMessage}
-              handleCaptureRound={handleCaptureRound}
-              handleInventoryChange={handleInventoryChange}
-              inventoryInputs={inventoryInputs}
-              isDesktopShell={isDesktopShell}
-              isOverlayMode
-              onOpenOverlay={handleOpenOverlay}
-              projectedRoundGain={projectedRoundGain}
-              roundGains={roundGains}
-              selectedMap={selectedMap}
-              selectedSession={selectedSession}
-              nextRoundNumber={nextRoundNumber}
+            <OverlayWindowControls
+              onClose={handleCloseOverlay}
+              onOpenDashboard={handleOpenMainWindow}
+              onOpacityChange={handleOverlayOpacityChange}
+              opacityValue={overlayOpacity}
+              showDashboardButton={isDesktopShell}
             />
-          </>
-        ) : (
-          <section className="page-panel onboarding-panel">
-            <div className="title-plate compact">
-              <p className="eyebrow">Ready Room</p>
-              <h2>Preparing Local Session</h2>
-              <div className="title-divider" />
-            </div>
-            <p className="subtle-text">FarmTracks is preparing the overlay session.</p>
           </section>
-        )}
-      </main>
+
+          {selectedPlayer ? (
+            <>
+              <section className="overlay-map-switcher page-panel">
+                <div className="panel-header">
+                  <div>
+                    <h2>Route</h2>
+                    <p className="subtle-text">Switch the active farming route without touching the main window.</p>
+                  </div>
+                </div>
+                <div className="sidebar-map-list overlay-map-list" role="tablist" aria-label="Map selector">
+                  {MAPS.map((map) => (
+                    <button
+                      key={map.id}
+                      type="button"
+                      className={`sidebar-map-item ${map.id === selectedMapId ? "active" : ""}`}
+                      onClick={() => setSelectedMapId(map.id)}
+                    >
+                      <strong>{map.name}</strong>
+                      <span>{map.subtitle}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {isNarwashiAutoCaptureAvailable ? (
+                <AutoCapturePanel
+                  busy={autoCaptureBusy}
+                  hasProfile={Boolean(autoCaptureProfile)}
+                  lastResult={autoCaptureResult}
+                  message={autoCaptureMessage}
+                  onAutoCapture={() => runNarwashiAutoCapture(true)}
+                  onAutoFill={() => runNarwashiAutoCapture(false)}
+                  onClearCalibration={handleClearAutoCaptureCalibration}
+                  onStartCalibration={handleStartAutoCaptureCalibration}
+                />
+              ) : null}
+
+              <CapturePanel
+                formMessage={formMessage}
+                handleCaptureRound={handleCaptureRound}
+                handleInventoryChange={handleInventoryChange}
+                inventoryInputs={inventoryInputs}
+                isDesktopShell={isDesktopShell}
+                isOverlayMode
+                onOpenOverlay={handleOpenOverlay}
+                projectedRoundGain={projectedRoundGain}
+                roundGains={roundGains}
+                selectedMap={selectedMap}
+                selectedSession={selectedSession}
+                nextRoundNumber={nextRoundNumber}
+              />
+            </>
+          ) : (
+            <section className="page-panel onboarding-panel">
+              <div className="title-plate compact">
+                <p className="eyebrow">Ready Room</p>
+                <h2>Preparing Local Session</h2>
+                <div className="title-divider" />
+              </div>
+              <p className="subtle-text">FarmTracks is preparing the overlay session.</p>
+            </section>
+          )}
+        </main>
+        {calibrationSession ? (
+          <AutoCaptureCalibrationModal
+            session={calibrationSession}
+            onCancel={() => setCalibrationSession(null)}
+            onRetake={handleRetakeAutoCaptureCalibration}
+            onSelect={handleSelectCalibrationPoint}
+          />
+        ) : null}
+      </>
     );
   }
 

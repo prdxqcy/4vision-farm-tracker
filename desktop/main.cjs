@@ -186,8 +186,21 @@ ipcMain.handle("farmtracks:set-overlay-opacity", (_event, opacity) => {
   return safeOpacity;
 });
 
-ipcMain.handle("farmtracks:capture-screen", async () => {
+ipcMain.handle("farmtracks:capture-screen", async (event, options = {}) => {
+  const currentWindow = BrowserWindow.fromWebContents(event.sender);
+
+  if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {
+    currentWindow.hide();
+    await new Promise((resolve) => setTimeout(resolve, 180));
+  }
+
   const image = await screenshot({ format: "png" });
+
+  if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {
+    currentWindow.show();
+    currentWindow.focus();
+  }
+
   return `data:image/png;base64,${image.toString("base64")}`;
 });
 

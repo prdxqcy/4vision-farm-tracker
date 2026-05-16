@@ -5,11 +5,12 @@ const NARWASHI_PROFILE_ID = "narwashi-v1";
 const TEMPLATE_SIZE = 28;
 const TEMPLATE_INSET = 4;
 const MATCH_SAMPLE_STEP = 2;
-const SCAN_STEP = 3;
+const SCAN_STEP = 2;
 const SCALES = [0.88, 0.94, 1, 1.06, 1.12];
 const MAX_MATCHES_PER_ITEM = 24;
-const BASE_MATCH_THRESHOLD = 0.185;
+const BASE_MATCH_THRESHOLD = 0.22;
 const DUPLICATE_DISTANCE = 20;
+const MAX_SLOT_COUNT = 199;
 let ocrWorkerPromise = null;
 
 export const NARWASHI_AUTO_CAPTURE_ITEMS = [
@@ -150,14 +151,16 @@ function resizeCanvas(sourceCanvas, width, height) {
   return resizedCanvas;
 }
 
-function preprocessDigits(slotCanvas) {
+function preprocessDigits(slotCanvas, variant) {
   const sourceWidth = slotCanvas.width;
   const sourceHeight = slotCanvas.height;
-  const digitCanvas = createOffscreenCanvas(sourceWidth * 5, Math.max(20, sourceHeight * 3));
+  const digitCanvas = createOffscreenCanvas(sourceWidth * variant.scale, Math.max(20, sourceHeight * 3));
   const context = digitCanvas.getContext("2d", { willReadFrequently: true });
+  const cropY = Math.floor(sourceHeight * variant.cropTop);
+  const cropHeight = Math.ceil(sourceHeight * variant.cropHeight);
 
   context.imageSmoothingEnabled = false;
-  context.drawImage(slotCanvas, 0, Math.floor(sourceHeight * 0.45), sourceWidth, Math.ceil(sourceHeight * 0.42), 0, 0, digitCanvas.width, digitCanvas.height);
+  context.drawImage(slotCanvas, 0, cropY, sourceWidth, cropHeight, 0, 0, digitCanvas.width, digitCanvas.height);
 
   const imageData = context.getImageData(0, 0, digitCanvas.width, digitCanvas.height);
   const { data } = imageData;
@@ -167,7 +170,7 @@ function preprocessDigits(slotCanvas) {
     const green = data[index + 1];
     const blue = data[index + 2];
     const highlight = (red * 0.45) + (green * 0.45) - (blue * 0.2);
-    const isDigit = highlight > 95 && red > 70 && green > 55;
+    const isDigit = highlight > variant.threshold && red > variant.minRed && green > variant.minGreen;
     const nextValue = isDigit ? 255 : 0;
 
     data[index] = nextValue;
@@ -185,7 +188,7 @@ async function getOcrWorker() {
     ocrWorkerPromise = (async () => {
       const worker = await createWorker("eng");
       await worker.setParameters({
-        tessedit_pageseg_mode: "7",
+        tessedit_pageseg_mode: "8",
         tessedit_char_whitelist: "0123456789"
       });
       return worker;
@@ -210,18 +213,48 @@ async function extractCountFromSlot(screenCanvas, match) {
     match.slotSize
   );
 
-  const digitCanvas = preprocessDigits(slotCanvas);
   const worker = await getOcrWorker();
-  const result = await worker.recognize(digitCanvas.toDataURL("image/png"));
-  const rawResult = String(result?.data?.text ?? "").replace(/\s+/g, "");
-  const digits = rawResult.replace(/\D/g, "");
+  const variants = [
+    { cropTop: 0.42, cropHeight: 0.5, scale: 6, threshold: 78, minRed: 58, minGreen: 46 },
+    { cropTop: 0.42, cropHeight: 0.5, scale: 6, threshold: 92, minRed: 68, minGreen: 52 },
+    { cropTop: 0.46, cropHeight: 0.46, scale: 7, threshold: 82, minRed: 58, minGreen: 46 },
+    { cropTop: 0.36, cropHeight: 0.58, scale: 7, threshold: 105, minRed: 70, minGreen: 58 }
+  ];
+  const candidates = [];
 
-  if (!digits) {
-    return 0;
+  for (const variant of variants) {
+    const digitCanvas = preprocessDigits(slotCanvas, variant);
+    const result = await worker.recognize(digitCanvas.toDataURL("image/png"));
+    const rawResult = String(result?.data?.text ?? "").replace(/\s+/g, "");
+    const digits = rawResult.replace(/\D/g, "");
+
+    if (!digits) {
+      continue;
+    }
+
+    const value = Number.parseInt(digits, 10);
+
+    if (Number.isFinite(value) && value > 0 && value <= MAX_SLOT_COUNT) {
+      candidates.push({
+        value,
+        confidence: Number(result?.data?.confidence ?? 0)
+      });
+    }
   }
 
-  const value = Number.parseInt(digits, 10);
-  return Number.isFinite(value) ? value : 0;
+  if (candidates.length === 0) {
+    return 1;
+  }
+
+  candidates.sort((left, right) => {
+    if (Math.abs(right.confidence - left.confidence) <= 6) {
+      return right.value - left.value;
+    }
+
+    return right.confidence - left.confidence;
+  });
+
+  return candidates[0].value;
 }
 
 async function loadTemplateProfile(profileItem) {
@@ -320,20 +353,20 @@ export async function createNarwashiAutoCaptureProfile({ screenshotDataUrl, sele
   return profile;
 }
 
-export async function captureDesktopScreenshot() {
+export async function captureDesktopScreenshot(options = {}) {
   if (!window.farmtracksDesktop?.captureScreen) {
     throw new Error("Desktop screenshot capture is only available in the Windows app.");
   }
 
-  return window.farmtracksDesktop.captureScreen();
+  return window.farmtracksDesktop.captureScreen(options);
 }
 
-export async function scanNarwashiScreen(profile) {
+export async function scanNarwashiScreen(profile, options = {}) {
   if (!profile?.items?.length) {
     throw new Error("Complete auto-capture calibration before scanning.");
   }
 
-  const screenshotDataUrl = await captureDesktopScreenshot();
+  const screenshotDataUrl = await captureDesktopScreenshot(options);
   const screenCanvas = await createCanvasFromImage(screenshotDataUrl);
   const allMatches = [];
 

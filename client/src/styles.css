@@ -701,6 +701,34 @@ input:focus {
   pointer-events: none;
 }
 
+.overlay-shell .auto-capture-panel {
+  gap: 12px;
+  padding: 14px;
+}
+
+.overlay-shell .auto-capture-panel .panel-header {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.overlay-shell .auto-capture-panel h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.overlay-shell .auto-capture-panel .subtle-text {
+  display: none;
+}
+
+.overlay-shell .auto-capture-actions,
+.overlay-shell .auto-capture-meta {
+  align-items: stretch;
+}
+
+.overlay-shell .auto-capture-results {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .stack-column {
   display: flex;
   flex-direction: column;
