@@ -69,7 +69,6 @@ function App() {
   const [players, setPlayers] = useState(() => loadPlayers());
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedMapId, setSelectedMapId] = useState(DEFAULT_MAP_ID);
-  const [newPlayerName, setNewPlayerName] = useState("");
   const [inventoryInputs, setInventoryInputs] = useState({});
   const [storageError, setStorageError] = useState("");
   const [formMessage, setFormMessage] = useState("");
@@ -101,6 +100,13 @@ function App() {
   );
 
   useEffect(() => {
+    if (players.length === 0) {
+      const localPlayer = createNewPlayer("Local Session");
+      setPlayers([localPlayer]);
+      setSelectedPlayerId(localPlayer.id);
+      return;
+    }
+
     const error = savePlayers(players);
     setStorageError(error);
 
@@ -168,19 +174,6 @@ function App() {
     : 0;
   const mapSnapshot = splitAmount(activeSnapshotTotal);
 
-  function handleAddPlayer(event) {
-    event.preventDefault();
-
-    if (!newPlayerName.trim()) {
-      return;
-    }
-
-    const player = createNewPlayer(newPlayerName);
-    setPlayers((currentPlayers) => [player, ...currentPlayers]);
-    setSelectedPlayerId(player.id);
-    setNewPlayerName("");
-  }
-
   function handleInventoryChange(itemId, field, nextValue) {
     setInventoryInputs((current) => ({
       ...current,
@@ -243,10 +236,6 @@ function App() {
       )
     );
     setFormMessage(`Current session reset for ${selectedPlayer.name}.`);
-  }
-
-  function handleDeletePlayer(playerId) {
-    setPlayers((currentPlayers) => currentPlayers.filter((player) => player.id !== playerId));
   }
 
   return (
@@ -313,44 +302,16 @@ function App() {
         <section className="page-panel roster-panel">
           <div className="panel-header">
             <div>
-              <h2>Player Roster</h2>
-              <p className="subtle-text">Create a runner and jump straight into checkpoint tracking.</p>
+              <h2>Browser Profile</h2>
+              <p className="subtle-text">
+                This tracker now uses one local session profile per browser, so there is no player-name setup.
+              </p>
             </div>
-            <form className="roster-form" onSubmit={handleAddPlayer}>
-              <input
-                id="playerName"
-                value={newPlayerName}
-                onChange={(event) => setNewPlayerName(event.target.value)}
-                placeholder="Create player"
-              />
-              <button type="submit" className="primary-button">Add player</button>
-            </form>
+            <div className="profile-badge">
+              <span>Profile</span>
+              <strong>{selectedPlayer?.name ?? "Preparing local session"}</strong>
+            </div>
           </div>
-
-          {players.length === 0 ? (
-            <p className="empty-state">Create a player to start tracking sessions on {selectedMap.name}.</p>
-          ) : (
-            <div className="player-carousel">
-              {players.map((player) => {
-                const liveRounds = Object.values(player.maps).reduce((sum, mapState) => sum + mapState.rounds, 0);
-                const currentMapRounds = player.maps[selectedMap.id]?.rounds ?? 0;
-
-                return (
-                  <button
-                    key={player.id}
-                    type="button"
-                    className={`player-card ${player.id === selectedPlayerId ? "active" : ""}`}
-                    onClick={() => setSelectedPlayerId(player.id)}
-                  >
-                    <span className="player-card-label">Operator</span>
-                    <strong>{player.name}</strong>
-                    <small>{currentMapRounds} rounds on {selectedMap.name}</small>
-                    <small>{liveRounds} live rounds across all maps</small>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </section>
 
         {!selectedPlayer ? (
@@ -386,13 +347,6 @@ function App() {
                   </button>
                   <button type="button" className="ghost-button" onClick={handleResetSession}>
                     Reset session
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button danger-button"
-                    onClick={() => handleDeletePlayer(selectedPlayer.id)}
-                  >
-                    Delete player
                   </button>
                 </div>
               </div>
