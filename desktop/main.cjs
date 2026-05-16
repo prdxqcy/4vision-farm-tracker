@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, screen } = require("electron");
 const OVERLAY_QUERY = "capture-overlay";
 const DEV_SERVER_URL = "http://127.0.0.1:5173";
 const CUSTOM_PROTOCOL = "farmtracks";
+const DEFAULT_OVERLAY_OPACITY = 0.78;
 
 let baseUrl = "";
 let localServer = null;
@@ -98,6 +99,12 @@ function registerProtocolClient() {
 }
 
 function createMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
+
   mainWindow = new BrowserWindow({
     width: 1480,
     height: 940,
@@ -145,6 +152,7 @@ function createOverlayWindow(options = {}) {
     autoHideMenuBar: true,
     resizable: true,
     alwaysOnTop: true,
+    opacity: DEFAULT_OVERLAY_OPACITY,
     maximizable: false,
     fullscreenable: false,
     webPreferences: sharedWebPreferences()
@@ -167,23 +175,31 @@ ipcMain.handle("farmtracks:open-overlay", () => {
   createOverlayWindow();
 });
 
+ipcMain.handle("farmtracks:open-main-window", () => {
+  createMainWindow();
+});
+
+ipcMain.handle("farmtracks:set-overlay-opacity", (_event, opacity) => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    return DEFAULT_OVERLAY_OPACITY;
+  }
+
+  const safeOpacity = Math.min(1, Math.max(0.35, Number(opacity) || DEFAULT_OVERLAY_OPACITY));
+  overlayWindow.setOpacity(safeOpacity);
+  return safeOpacity;
+});
+
 ipcMain.handle("farmtracks:close-window", (event) => {
   const currentWindow = BrowserWindow.fromWebContents(event.sender);
   currentWindow?.close();
 });
 
 function focusMainWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    createMainWindow();
-    return;
-  }
-
-  if (mainWindow.isMinimized()) {
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isMinimized()) {
     mainWindow.restore();
   }
 
-  mainWindow.show();
-  mainWindow.focus();
+  createMainWindow();
 }
 
 if (singleInstanceLock) {
@@ -198,12 +214,18 @@ if (singleInstanceLock) {
     const protocolUrl = findProtocolUrl(argv);
     const protocolRequest = parseProtocolUrl(protocolUrl);
 
-    focusMainWindow();
-
     if (protocolRequest) {
       pendingOverlayOptions = protocolRequest;
       createOverlayWindow(protocolRequest);
+      return;
     }
+
+    if (isDevelopment()) {
+      focusMainWindow();
+      return;
+    }
+
+    createOverlayWindow();
   });
 
   app.on("open-url", (event, protocolUrl) => {
@@ -221,15 +243,21 @@ if (singleInstanceLock) {
 app.whenReady().then(async () => {
   registerProtocolClient();
   await ensureBaseUrl();
-  createMainWindow();
 
-  if (pendingOverlayOptions.map || Object.keys(pendingOverlayOptions).length > 0) {
+  if (isDevelopment()) {
+    createMainWindow();
+  } else {
     createOverlayWindow(pendingOverlayOptions);
   }
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
+      if (isDevelopment()) {
+        createMainWindow();
+        return;
+      }
+
+      createOverlayWindow();
     }
   });
 });

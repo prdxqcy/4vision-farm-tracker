@@ -65,6 +65,36 @@ function buildInventoryInputs(map, snapshot = {}) {
   }, {});
 }
 
+function OverlayWindowControls({ onClose, onOpenDashboard, onOpacityChange, opacityValue, showDashboardButton }) {
+  return (
+    <div className="overlay-header-meta">
+      <div className="overlay-drag-copy">
+        <span className="eyebrow">Drag header to move</span>
+        <strong>Opacity {opacityValue}%</strong>
+      </div>
+      <label className="overlay-opacity-control overlay-close-button">
+        <span>Opacity</span>
+        <input
+          type="range"
+          min="45"
+          max="100"
+          step="1"
+          value={opacityValue}
+          onChange={(event) => onOpacityChange(Number(event.target.value))}
+        />
+      </label>
+      {showDashboardButton ? (
+        <button type="button" className="ghost-button overlay-close-button" onClick={onOpenDashboard}>
+          Dashboard
+        </button>
+      ) : null}
+      <button type="button" className="ghost-button overlay-close-button" onClick={onClose}>
+        Close
+      </button>
+    </div>
+  );
+}
+
 function OverlayAccessPanel({ guideMode, installerUrl, isDesktopShell, mapName, onDismiss, onInstall, onLaunch }) {
   const guideCopy = {
     install: {
@@ -310,6 +340,7 @@ function App() {
   const [storageError, setStorageError] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const [overlayGuideMode, setOverlayGuideMode] = useState("");
+  const [overlayOpacity, setOverlayOpacity] = useState(78);
   const [apiState, setApiState] = useState({
     loading: true,
     error: "",
@@ -499,6 +530,25 @@ function App() {
     window.close();
   }
 
+  function handleOpenMainWindow() {
+    if (!isDesktopShell) {
+      return;
+    }
+
+    window.farmtracksDesktop.openMainWindow();
+  }
+
+  async function handleOverlayOpacityChange(nextOpacity) {
+    setOverlayOpacity(nextOpacity);
+
+    if (!isDesktopShell || !isOverlayMode) {
+      return;
+    }
+
+    const appliedOpacity = await window.farmtracksDesktop.setOverlayOpacity(nextOpacity / 100);
+    setOverlayOpacity(Math.round(appliedOpacity * 100));
+  }
+
   function handleCaptureRound(event) {
     event.preventDefault();
 
@@ -560,11 +610,13 @@ function App() {
             <p className="eyebrow">FarmTracks Overlay</p>
             <h1>{selectedMap.name} Capture</h1>
           </div>
-          <div className="overlay-header-meta">
-            <button type="button" className="ghost-button overlay-close-button" onClick={handleCloseOverlay}>
-              Close
-            </button>
-          </div>
+          <OverlayWindowControls
+            onClose={handleCloseOverlay}
+            onOpenDashboard={handleOpenMainWindow}
+            onOpacityChange={handleOverlayOpacityChange}
+            opacityValue={overlayOpacity}
+            showDashboardButton={isDesktopShell}
+          />
         </section>
 
         {selectedPlayer ? (

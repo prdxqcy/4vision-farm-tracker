@@ -927,6 +927,37 @@ button:disabled {
   -webkit-app-region: drag;
 }
 
+.overlay-drag-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.overlay-drag-copy strong {
+  color: #fff0cf;
+  font-family: "Marcellus", serif;
+  font-weight: 400;
+}
+
+.overlay-opacity-control {
+  -webkit-app-region: no-drag;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--gold-faint);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.overlay-opacity-control input {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .overlay-close-button {
   -webkit-app-region: no-drag;
 }
