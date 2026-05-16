@@ -250,71 +250,87 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-top">
-          <div className="brand-block">
-            <div className="brand-mark">FT</div>
-            <div>
-              <p className="eyebrow">4Vision Operations</p>
-              <h1>FarmTracks</h1>
-            </div>
-          </div>
-
-          <div className="sidebar-overview card-like">
-            <div className="sidebar-overview-row">
-              <span>Players</span>
-              <strong>{players.length}</strong>
-            </div>
-            <div className="sidebar-overview-row">
-              <span>Maps</span>
-              <strong>{MAPS.length}</strong>
-            </div>
-            <div className="sidebar-overview-row">
-              <span>API</span>
-              <strong>{apiState.loading ? "..." : apiState.error ? "Offline" : "Ready"}</strong>
-            </div>
-          </div>
+    <div className="site-shell">
+      <header className="site-header">
+        <div className="site-status-bar">
+          <span className={`live-indicator ${apiState.error ? "offline" : ""}`}>
+            {apiState.loading ? "Syncing" : apiState.error ? "Offline" : "Online"}
+          </span>
+          <span className="status-copy">4Vision farm route control</span>
         </div>
 
-        <section className="sidebar-section">
-          <div className="sidebar-section-header">
-            <span className="sidebar-label">Map focus</span>
+        <div className="site-nav-bar">
+          <a className="brand-link" href="https://vision4s.com/" target="_blank" rel="noreferrer">
+            <img src="/vision4-assets/vision4-logo.png" alt="4Vision" className="brand-logo" />
+          </a>
+
+          <nav className="site-nav" aria-label="FarmTracks sections">
+            <button type="button" className="site-nav-item active">Operations</button>
+            <button type="button" className="site-nav-item">Players</button>
+            <button type="button" className="site-nav-item">Maps</button>
+            <button type="button" className="site-nav-item">Archive</button>
+          </nav>
+
+          <div className="header-cta">
+            <span>{selectedPlayer?.name ?? "No player selected"}</span>
+            <strong>{selectedMap.name}</strong>
           </div>
-          <div className="sidebar-map-list">
+        </div>
+      </header>
+
+      <main className="site-main">
+        <section className="title-panel">
+          <div className="title-plate">
+            <p className="eyebrow">4Vision Farm Operations</p>
+            <h1>Inventory Command Board</h1>
+            <div className="title-divider" />
+          </div>
+        </section>
+
+        <section className="page-panel map-panel">
+          <div className="panel-header centered">
+            <div>
+              <h2>Map Focus</h2>
+              <p className="subtle-text">Switch between tracked routes without leaving the board.</p>
+            </div>
+          </div>
+
+          <div className="tab-row" role="tablist" aria-label="Map selector">
             {MAPS.map((map) => (
               <button
                 key={map.id}
                 type="button"
-                className={`sidebar-map-item ${map.id === selectedMapId ? "active" : ""}`}
+                className={`tab-button ${map.id === selectedMapId ? "active" : ""}`}
                 onClick={() => setSelectedMapId(map.id)}
               >
                 <strong>{map.name}</strong>
-                <span>{map.items.length} tracked drops</span>
+                <span>{map.subtitle}</span>
               </button>
             ))}
           </div>
         </section>
 
-        <section className="sidebar-section">
-          <div className="sidebar-section-header">
-            <span className="sidebar-label">Player roster</span>
+        <section className="page-panel roster-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Player Roster</h2>
+              <p className="subtle-text">Create a runner and jump straight into checkpoint tracking.</p>
+            </div>
+            <form className="roster-form" onSubmit={handleAddPlayer}>
+              <input
+                id="playerName"
+                value={newPlayerName}
+                onChange={(event) => setNewPlayerName(event.target.value)}
+                placeholder="Create player"
+              />
+              <button type="submit" className="primary-button">Add player</button>
+            </form>
           </div>
 
-          <form className="sidebar-form" onSubmit={handleAddPlayer}>
-            <input
-              id="playerName"
-              value={newPlayerName}
-              onChange={(event) => setNewPlayerName(event.target.value)}
-              placeholder="Create player"
-            />
-            <button type="submit" className="primary-button small-button">Add player</button>
-          </form>
-
           {players.length === 0 ? (
-            <p className="empty-state">Create a player to start tracking sessions.</p>
+            <p className="empty-state">Create a player to start tracking sessions on {selectedMap.name}.</p>
           ) : (
-            <div className="player-list">
+            <div className="player-carousel">
               {players.map((player) => {
                 const liveRounds = Object.values(player.maps).reduce((sum, mapState) => sum + mapState.rounds, 0);
                 const currentMapRounds = player.maps[selectedMap.id]?.rounds ?? 0;
@@ -323,13 +339,12 @@ function App() {
                   <button
                     key={player.id}
                     type="button"
-                    className={`player-tile ${player.id === selectedPlayerId ? "active" : ""}`}
+                    className={`player-card ${player.id === selectedPlayerId ? "active" : ""}`}
                     onClick={() => setSelectedPlayerId(player.id)}
                   >
-                    <div className="player-tile-head">
-                      <strong>{player.name}</strong>
-                      <span>{currentMapRounds} on this map</span>
-                    </div>
+                    <span className="player-card-label">Operator</span>
+                    <strong>{player.name}</strong>
+                    <small>{currentMapRounds} rounds on {selectedMap.name}</small>
                     <small>{liveRounds} live rounds across all maps</small>
                   </button>
                 );
@@ -338,117 +353,92 @@ function App() {
           )}
         </section>
 
-        <div className="sidebar-footer card-like">
-          <span className="sidebar-label">Storage</span>
-          <p>{storageError ? storageError : "Browser persistence is active for this device."}</p>
-        </div>
-      </aside>
-
-      <main className="content-shell">
-        <header className="page-header">
-          <div className="page-header-copy">
-            <p className="eyebrow">Dashboard</p>
-            <h2>{selectedMap.name} farming operations</h2>
-            <p className="subtle-text max-copy">
-              Enter current stack counts after each route. FarmTracks turns those checkpoints into round gains,
-              keeps the running session total, and preserves the history for review.
-            </p>
-          </div>
-
-          <div className="page-header-meta">
-            <div className="meta-chip">
-              <span>Selected player</span>
-              <strong>{selectedPlayer?.name ?? "None"}</strong>
-            </div>
-            <div className="meta-chip">
-              <span>Map mode</span>
-              <strong>Looped route</strong>
-            </div>
-          </div>
-        </header>
-
         {!selectedPlayer ? (
-          <section className="hero-card">
-            <div className="hero-card-copy">
-              <h3>Select a player to start</h3>
-              <p className="subtle-text">
-                Choose a player from the sidebar or create a new one. The tracker will then open the live
-                checkpoint workspace for {selectedMap.name}.
-              </p>
+          <section className="page-panel onboarding-panel">
+            <div className="title-plate compact">
+              <p className="eyebrow">Ready Room</p>
+              <h2>Select a Player to Start</h2>
+              <div className="title-divider" />
             </div>
+            <p className="subtle-text">
+              Choose a player from the roster above. The live checkpoint board for {selectedMap.name} opens as soon as
+              one runner is active.
+            </p>
           </section>
         ) : (
           <>
-            <section className="hero-card">
-              <div className="hero-card-copy">
-                <p className="eyebrow">Live session</p>
-                <h3>{selectedPlayer.name} - {selectedMap.name}</h3>
-                <p className="subtle-text max-copy">
-                  {metadataMap?.notes ?? selectedMap.note}
-                </p>
+            <section className="page-panel session-panel">
+              <div className="session-hero">
+                <div>
+                  <p className="eyebrow">Live Session</p>
+                  <h2>{selectedPlayer.name} - {selectedMap.name}</h2>
+                  <p className="subtle-text">{metadataMap?.notes ?? selectedMap.note}</p>
+                </div>
+
+                <div className="hero-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleFinishSession}
+                    disabled={!selectedSession || selectedSession.rounds === 0}
+                  >
+                    Finish session
+                  </button>
+                  <button type="button" className="ghost-button" onClick={handleResetSession}>
+                    Reset session
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button danger-button"
+                    onClick={() => handleDeletePlayer(selectedPlayer.id)}
+                  >
+                    Delete player
+                  </button>
+                </div>
               </div>
 
-              <div className="hero-card-actions">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handleFinishSession}
-                  disabled={!selectedSession || selectedSession.rounds === 0}
-                >
-                  Finish session
-                </button>
-                <button type="button" className="ghost-button" onClick={handleResetSession}>
-                  Reset session
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button danger-button"
-                  onClick={() => handleDeletePlayer(selectedPlayer.id)}
-                >
-                  Delete player
-                </button>
+              <div className="session-stats">
+                <article className="stat-cell">
+                  <span>Next round</span>
+                  <strong>{nextRoundNumber}</strong>
+                  <small>Checkpoint ready</small>
+                </article>
+                <article className="stat-cell">
+                  <span>Session rounds</span>
+                  <strong>{selectedSession?.rounds ?? 0}</strong>
+                  <small>Saved on this route</small>
+                </article>
+                <article className="stat-cell">
+                  <span>Session yield</span>
+                  <strong>{sessionTotal}</strong>
+                  <small>Total items earned</small>
+                </article>
+                <article className="stat-cell">
+                  <span>Current bag</span>
+                  <strong>{mapSnapshot.stacks}</strong>
+                  <small>{mapSnapshot.loose} loose items</small>
+                </article>
+                <article className="stat-cell">
+                  <span>Archived runs</span>
+                  <strong>{completedSessions}</strong>
+                  <small>Completed sessions</small>
+                </article>
+                <article className="stat-cell">
+                  <span>Player load</span>
+                  <strong>{allLiveRounds}</strong>
+                  <small>Rounds across all maps</small>
+                </article>
               </div>
             </section>
 
-            <section className="kpi-grid">
-              <article className="kpi-card">
-                <span>Next round</span>
-                <strong>{nextRoundNumber}</strong>
-                <small>Checkpoint ready to capture</small>
-              </article>
-              <article className="kpi-card">
-                <span>Session rounds</span>
-                <strong>{selectedSession?.rounds ?? 0}</strong>
-                <small>Rounds saved on this map</small>
-              </article>
-              <article className="kpi-card">
-                <span>Session yield</span>
-                <strong>{sessionTotal}</strong>
-                <small>Total items earned this session</small>
-              </article>
-              <article className="kpi-card">
-                <span>Current bag</span>
-                <strong>{mapSnapshot.stacks}</strong>
-                <small>Stacks and {mapSnapshot.loose} loose items</small>
-              </article>
-              <article className="kpi-card">
-                <span>Archived sessions</span>
-                <strong>{completedSessions}</strong>
-                <small>Completed runs for this map</small>
-              </article>
-              <article className="kpi-card">
-                <span>Player load</span>
-                <strong>{allLiveRounds}</strong>
-                <small>Active rounds across all maps</small>
-              </article>
-            </section>
-
-            <section className="dashboard-grid">
-              <form className="dashboard-card capture-card" onSubmit={handleCaptureRound}>
-                <div className="card-header">
+            <section className="content-grid">
+              <form className="page-panel capture-panel" onSubmit={handleCaptureRound}>
+                <div className="panel-header">
                   <div>
-                    <p className="card-label">Checkpoint input</p>
-                    <h3>Capture current inventory</h3>
+                    <h2>Capture Current Inventory</h2>
+                    <p className="subtle-text">
+                      Enter current stack counts after each route clear. FarmTracks calculates the round gain.
+                    </p>
                   </div>
                   <span className={`status-pill ${apiState.error ? "offline" : ""}`}>
                     {apiState.loading ? "API loading" : apiState.error ? "API offline" : "API ready"}
@@ -466,6 +456,7 @@ function App() {
                           {splitAmount(selectedSession?.currentSnapshot?.[item.id] ?? 0).loose} loose
                         </span>
                       </div>
+
                       <div className="checkpoint-fields">
                         <label>
                           <span>Stacks</span>
@@ -510,26 +501,25 @@ function App() {
                 </div>
               </form>
 
-              <div className="insights-column">
-                <article className="dashboard-card chart-card">
-                  <div className="card-header">
+              <div className="stack-column">
+                <article className="page-panel insight-panel">
+                  <div className="panel-header">
                     <div>
-                      <p className="card-label">Performance</p>
-                      <h3>Round gain trend</h3>
+                      <h2>Round Gain Trend</h2>
+                      <p className="subtle-text">Last 12 captured rounds.</p>
                     </div>
-                    <span className="card-meta">Last 12 rounds</span>
                   </div>
                   <RoundTrendChart history={selectedSession?.history ?? []} />
                 </article>
 
-                <article className="dashboard-card totals-card">
-                  <div className="card-header">
+                <article className="page-panel insight-panel">
+                  <div className="panel-header">
                     <div>
-                      <p className="card-label">Totals</p>
-                      <h3>Session inventory</h3>
+                      <h2>Session Inventory</h2>
+                      <p className="subtle-text">{selectedMap.items.length} tracked items on this route.</p>
                     </div>
-                    <span className="card-meta">{selectedMap.items.length} items tracked</span>
                   </div>
+
                   <div className="totals-list">
                     {selectedMap.items.map((item) => {
                       const total = selectedSession?.totals[item.id] ?? 0;
@@ -560,14 +550,14 @@ function App() {
             </section>
 
             <section className="records-grid">
-              <article className="dashboard-card records-card">
-                <div className="card-header">
+              <article className="page-panel records-card">
+                <div className="panel-header">
                   <div>
-                    <p className="card-label">History</p>
-                    <h3>Recent rounds</h3>
+                    <h2>Recent Rounds</h2>
+                    <p className="subtle-text">Latest checkpoints on {selectedMap.name}.</p>
                   </div>
-                  <span className="card-meta">Scrollable log</span>
                 </div>
+
                 {!selectedSession || selectedSession.history.length === 0 ? (
                   <p className="empty-state">Captured rounds will appear here.</p>
                 ) : (
@@ -596,14 +586,14 @@ function App() {
                 )}
               </article>
 
-              <article className="dashboard-card records-card">
-                <div className="card-header">
+              <article className="page-panel records-card">
+                <div className="panel-header">
                   <div>
-                    <p className="card-label">Archive</p>
-                    <h3>Finished sessions</h3>
+                    <h2>Finished Sessions</h2>
+                    <p className="subtle-text">Completed run archive for this map.</p>
                   </div>
-                  <span className="card-meta">Latest completed runs</span>
                 </div>
+
                 {!selectedSession || selectedSession.sessions.length === 0 ? (
                   <p className="empty-state">Finish a session to archive its totals here.</p>
                 ) : (
@@ -629,6 +619,17 @@ function App() {
                   </div>
                 )}
               </article>
+            </section>
+
+            <section className="page-panel footer-meta">
+              <div className="meta-entry">
+                <span>Persistence</span>
+                <strong>{storageError ? storageError : "Browser persistence is active for this device."}</strong>
+              </div>
+              <div className="meta-entry">
+                <span>Session start</span>
+                <strong>{selectedSession?.startedAt ? formatDate(selectedSession.startedAt) : "No active session"}</strong>
+              </div>
             </section>
           </>
         )}
