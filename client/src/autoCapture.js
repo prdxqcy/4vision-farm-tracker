@@ -15,7 +15,15 @@ const MAX_SLOT_COUNT = 199;
 let ocrWorkerPromise = null;
 
 export const NARWASHI_AUTO_CAPTURE_ITEMS = [
-  { id: "crystals", name: "Crystal", shortName: "Crystal", countMode: "instances", maxMatches: 6 },
+  {
+    id: "crystals",
+    name: "Crystal",
+    shortName: "Crystal",
+    countMode: "instances",
+    maxMatches: 10,
+    matchThreshold: 0.27,
+    featureThreshold: 0.44
+  },
   { id: "arcanes", name: "Arcane", shortName: "Arcane", countMode: "best-stack", maxMatches: 3 },
   { id: "speed-potions", name: "Speed Potion", shortName: "Speed", countMode: "best-stack", maxMatches: 3 }
 ];
@@ -449,6 +457,7 @@ async function findTemplateMatches(screenCanvas, profileItem) {
   const matches = [];
   const screenContext = screenCanvas.getContext("2d", { willReadFrequently: true });
   const screenImage = screenContext.getImageData(0, 0, screenCanvas.width, screenCanvas.height);
+  const itemRule = AUTO_CAPTURE_ITEM_RULES[profileItem.itemId] ?? {};
 
   for (const scale of SCALES) {
     const scaledWidth = Math.max(12, Math.round(templateCanvas.canvas.width * scale));
@@ -468,7 +477,8 @@ async function findTemplateMatches(screenCanvas, profileItem) {
       data: imageData.data
     };
 
-    const threshold = BASE_MATCH_THRESHOLD + Math.abs(1 - scale) * 0.05;
+    const threshold = (itemRule.matchThreshold ?? BASE_MATCH_THRESHOLD) + Math.abs(1 - scale) * 0.05;
+    const featureThreshold = itemRule.featureThreshold ?? FEATURE_MATCH_THRESHOLD;
 
     for (let y = 0; y <= screenCanvas.height - template.height; y += SCAN_STEP) {
       for (let x = 0; x <= screenCanvas.width - template.width; x += SCAN_STEP) {
@@ -478,7 +488,7 @@ async function findTemplateMatches(screenCanvas, profileItem) {
           const candidateFeature = buildFeatureAtPosition(screenImage.data, screenCanvas.width, template, x, y);
           const featureDistance = getFeatureDistance(templateCanvas.feature, candidateFeature);
 
-          if (featureDistance > FEATURE_MATCH_THRESHOLD) {
+          if (featureDistance > featureThreshold) {
             continue;
           }
 
@@ -498,7 +508,6 @@ async function findTemplateMatches(screenCanvas, profileItem) {
     }
   }
 
-  const itemRule = AUTO_CAPTURE_ITEM_RULES[profileItem.itemId] ?? {};
   return dedupeMatches(matches).slice(0, itemRule.maxMatches ?? MAX_MATCHES_PER_ITEM);
 }
 

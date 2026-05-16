@@ -82,6 +82,13 @@ function buildInventoryInputs(map, snapshot = {}) {
   }, {});
 }
 
+function mergeWithCurrentSnapshot(map, currentSnapshot = {}, detectedSnapshot = {}) {
+  return map.items.reduce((snapshot, item) => {
+    snapshot[item.id] = Math.max(currentSnapshot[item.id] ?? 0, detectedSnapshot[item.id] ?? 0);
+    return snapshot;
+  }, {});
+}
+
 function OverlayWindowControls({ onClose, onOpenDashboard, onOpacityChange, opacityValue, showDashboardButton }) {
   return (
     <div className="overlay-header-meta">
@@ -842,14 +849,15 @@ function App() {
     setAutoCaptureMessage("");
 
     try {
-      const result = await scanNarwashiScreen(autoCaptureProfile, { hideCurrentWindow: true });
-      const summary = `Detected ${result.snapshot.crystals} crystals, ${result.snapshot.arcanes} arcanes, and ${result.snapshot["speed-potions"]} speed potions from ${result.matches.length} matched slots.`;
+      const mergedSnapshot = mergeWithCurrentSnapshot(selectedMap, selectedSession?.currentSnapshot, result.snapshot);
+      const mergedResult = { ...result, snapshot: mergedSnapshot };
+      const summary = `Detected ${mergedSnapshot.crystals} crystals, ${mergedSnapshot.arcanes} arcanes, and ${mergedSnapshot["speed-potions"]} speed potions from ${result.matches.length} matched slots.`;
 
-      setAutoCaptureResult(result);
-      setInventoryInputs(buildInventoryInputs(selectedMap, result.snapshot));
+      setAutoCaptureResult(mergedResult);
+      setInventoryInputs(buildInventoryInputs(selectedMap, mergedSnapshot));
 
       if (autoSubmit) {
-        const captured = applySnapshot(result.snapshot, "auto-capture");
+        const captured = applySnapshot(mergedSnapshot, "auto-capture");
         setAutoCaptureMessage(captured ? `${summary} Round recorded automatically.` : `${summary} Review the filled values before capturing.`);
       } else {
         setAutoCaptureMessage(`${summary} Review the filled values or press Auto-capture round.`);
