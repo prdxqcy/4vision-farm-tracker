@@ -42,6 +42,15 @@ function getProtocolLaunchUrl(mapId) {
   return launchUrl.toString();
 }
 
+function triggerDesktopProtocol(url) {
+  const launchLink = document.createElement("a");
+  launchLink.href = url;
+  launchLink.style.display = "none";
+  document.body.appendChild(launchLink);
+  launchLink.click();
+  launchLink.remove();
+}
+
 function formatDate(value) {
   return new Date(value).toLocaleString();
 }
@@ -102,6 +111,7 @@ function OverlayAccessPanel({ guideMode, installerUrl, isDesktopShell, mapName, 
       title: "Set up the Windows overlay app",
       steps: [
         "Your browser should start downloading the FarmTracks Overlay installer.",
+        "If Windows SmartScreen appears, press 'More info' and then 'Run anyway' because this installer is not code-signed yet.",
         "Open the downloaded installer and approve the Windows prompt if it appears.",
         "Leave 'Launch FarmTracks Overlay' enabled at the end of setup so the app opens immediately.",
         "Return to this page after installation and press Launch Overlay whenever you want the in-game panel."
@@ -113,7 +123,7 @@ function OverlayAccessPanel({ guideMode, installerUrl, isDesktopShell, mapName, 
       steps: [
         `Your browser is asking Windows to open the FarmTracks Overlay app for ${mapName}.`,
         "If Windows shows an 'Open FarmTracks Overlay' prompt, approve it to continue.",
-        "If nothing opens, install the overlay app first and then press Launch Overlay again.",
+        "If nothing opens, install the overlay app first and launch it once manually so Windows registers the farmtracks:// link handler.",
         "Run your game in borderless windowed mode for the always-on-top overlay to stay visible."
       ]
     },
@@ -518,7 +528,7 @@ function App() {
     }
 
     setOverlayGuideMode("launch");
-    window.location.href = getProtocolLaunchUrl(selectedMapId);
+    triggerDesktopProtocol(getProtocolLaunchUrl(selectedMapId));
   }
 
   function handleCloseOverlay() {
@@ -606,9 +616,13 @@ function App() {
     return (
       <main className="overlay-shell">
         <section className="overlay-header page-panel">
-          <div>
+          <div className="overlay-drag-surface">
             <p className="eyebrow">FarmTracks Overlay</p>
             <h1>{selectedMap.name} Capture</h1>
+            <div className="overlay-drag-handle" aria-hidden="true">
+              <span className="overlay-drag-grip" />
+              <span className="overlay-drag-label">Drag to move overlay</span>
+            </div>
           </div>
           <OverlayWindowControls
             onClose={handleCloseOverlay}

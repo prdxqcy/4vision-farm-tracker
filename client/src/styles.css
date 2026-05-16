@@ -934,6 +934,14 @@ button:disabled {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.overlay-drag-surface {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
   -webkit-app-region: drag;
 }
 
@@ -941,6 +949,33 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.overlay-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(236, 209, 154, 0.18);
+  background: rgba(16, 20, 26, 0.34);
+}
+
+.overlay-drag-grip {
+  width: 18px;
+  height: 10px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(236, 209, 154, 0.6) 1.2px, transparent 1.4px) 0 0 / 6px 6px repeat;
+  opacity: 0.9;
+}
+
+.overlay-drag-label {
+  color: var(--gold-faint);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .overlay-drag-copy strong {
@@ -1047,6 +1082,10 @@ button:disabled {
 
   .overlay-header {
     align-items: stretch;
+  }
+
+  .overlay-drag-surface {
+    min-width: 0;
   }
 
   .overlay-header-meta {
