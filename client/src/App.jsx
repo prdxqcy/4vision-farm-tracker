@@ -77,12 +77,8 @@ function buildInventoryInputs(map, snapshot = {}) {
 function OverlayWindowControls({ onClose, onOpenDashboard, onOpacityChange, opacityValue, showDashboardButton }) {
   return (
     <div className="overlay-header-meta">
-      <div className="overlay-drag-copy">
-        <span className="eyebrow">Drag header to move</span>
-        <strong>Opacity {opacityValue}%</strong>
-      </div>
-      <label className="overlay-opacity-control overlay-close-button">
-        <span>Opacity</span>
+      <label className="overlay-opacity-control">
+        <span className="overlay-opacity-label">Opacity {opacityValue}%</span>
         <input
           type="range"
           min="45"
@@ -93,11 +89,11 @@ function OverlayWindowControls({ onClose, onOpenDashboard, onOpacityChange, opac
         />
       </label>
       {showDashboardButton ? (
-        <button type="button" className="ghost-button overlay-close-button" onClick={onOpenDashboard}>
+        <button type="button" className="ghost-button overlay-action-button overlay-close-button" onClick={onOpenDashboard}>
           Dashboard
         </button>
       ) : null}
-      <button type="button" className="ghost-button overlay-close-button" onClick={onClose}>
+      <button type="button" className="ghost-button overlay-action-button overlay-close-button" onClick={onClose}>
         Close
       </button>
     </div>

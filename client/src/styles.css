@@ -931,9 +931,10 @@ button:disabled {
 
 .overlay-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  -webkit-app-region: drag;
 }
 
 .overlay-drag-surface {
@@ -942,13 +943,7 @@ button:disabled {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  -webkit-app-region: drag;
-}
-
-.overlay-drag-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  user-select: none;
 }
 
 .overlay-drag-handle {
@@ -978,30 +973,32 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.overlay-drag-copy strong {
-  color: #fff0cf;
-  font-family: "Marcellus", serif;
-  font-weight: 400;
-}
-
 .overlay-header-meta {
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 10px;
 }
 
 .overlay-opacity-control {
   -webkit-app-region: no-drag;
-  min-width: 132px;
-  max-width: 148px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
   color: var(--gold-faint);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.overlay-opacity-label {
+  color: #fff0cf;
+  font-family: "Marcellus", serif;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .overlay-opacity-control input {
@@ -1011,9 +1008,22 @@ button:disabled {
   box-shadow: none;
 }
 
+.overlay-action-button {
+  align-self: stretch;
+}
+
 .overlay-close-button {
   -webkit-app-region: no-drag;
   flex-shrink: 0;
+}
+
+.overlay-header .eyebrow,
+.overlay-header h1,
+.overlay-drag-handle,
+.overlay-drag-grip,
+.overlay-drag-label {
+  pointer-events: none;
+  user-select: none;
 }
 
 .overlay-header-meta .ghost-button {
@@ -1084,12 +1094,9 @@ button:disabled {
     align-items: stretch;
   }
 
-  .overlay-drag-surface {
-    min-width: 0;
-  }
-
   .overlay-header-meta {
-    justify-content: space-between;
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .checkpoint-grid,
@@ -1138,6 +1145,6 @@ button:disabled {
   }
 
   .overlay-header-meta {
-    flex-wrap: wrap;
+    grid-template-columns: 1fr;
   }
 }
