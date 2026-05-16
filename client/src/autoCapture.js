@@ -329,6 +329,21 @@ function resizeCanvas(sourceCanvas, width, height) {
   return resizedCanvas;
 }
 
+function cropCanvasRegion(sourceCanvas, region) {
+  if (!region) {
+    return sourceCanvas;
+  }
+
+  const x = clamp(Math.round(region.x), 0, sourceCanvas.width - 1);
+  const y = clamp(Math.round(region.y), 0, sourceCanvas.height - 1);
+  const width = clamp(Math.round(region.width), 1, sourceCanvas.width - x);
+  const height = clamp(Math.round(region.height), 1, sourceCanvas.height - y);
+  const croppedCanvas = createOffscreenCanvas(width, height);
+  const context = croppedCanvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(sourceCanvas, x, y, width, height, 0, 0, width, height);
+  return croppedCanvas;
+}
+
 function preprocessDigits(slotCanvas, variant) {
   const sourceWidth = slotCanvas.width;
   const sourceHeight = slotCanvas.height;
@@ -521,7 +536,7 @@ export function clearNarwashiAutoCaptureProfile() {
   setStoredProfiles(profiles);
 }
 
-export async function createNarwashiAutoCaptureProfile({ screenshotDataUrl, selections }) {
+export async function createNarwashiAutoCaptureProfile({ screenshotDataUrl, scanRegion, selections }) {
   const sourceCanvas = await createCanvasFromImage(screenshotDataUrl);
   const items = [];
 
@@ -541,6 +556,7 @@ export async function createNarwashiAutoCaptureProfile({ screenshotDataUrl, sele
   const profile = {
     id: NARWASHI_PROFILE_ID,
     createdAt: new Date().toISOString(),
+    scanRegion,
     items
   };
 
@@ -565,7 +581,8 @@ export async function scanNarwashiScreen(profile, options = {}) {
   }
 
   const screenshotDataUrl = await captureDesktopScreenshot(options);
-  const screenCanvas = await createCanvasFromImage(screenshotDataUrl);
+  const fullScreenCanvas = await createCanvasFromImage(screenshotDataUrl);
+  const screenCanvas = cropCanvasRegion(fullScreenCanvas, profile.scanRegion);
   const allMatches = [];
 
   for (const item of profile.items) {

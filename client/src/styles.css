@@ -701,6 +701,14 @@ input:focus {
   pointer-events: none;
 }
 
+.auto-capture-region {
+  position: absolute;
+  border: 2px solid #74b7ff;
+  background: rgba(70, 143, 247, 0.16);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.26);
+  pointer-events: none;
+}
+
 .overlay-shell .auto-capture-panel {
   gap: 12px;
   padding: 14px;
