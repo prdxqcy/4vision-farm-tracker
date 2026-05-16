@@ -209,6 +209,14 @@ input:focus {
   justify-content: flex-end;
 }
 
+.overlay-launch-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .sidebar-nav {
   margin-top: 6px;
 }
@@ -317,6 +325,7 @@ input:focus {
 .map-panel,
 .session-panel,
 .capture-panel,
+.overlay-access-panel,
 .insight-panel,
 .records-card,
 .onboarding-panel,
@@ -559,6 +568,52 @@ input:focus {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
   gap: 20px;
+}
+
+.overlay-access-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.overlay-guide {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(70, 143, 247, 0.24);
+  background: linear-gradient(180deg, rgba(22, 34, 56, 0.64), rgba(18, 24, 36, 0.54));
+}
+
+.overlay-guide-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overlay-guide-copy strong {
+  font-family: "Marcellus", serif;
+  font-size: 1.15rem;
+  color: #fff0cf;
+}
+
+.overlay-guide-steps {
+  margin: 14px 0 12px;
+  padding-left: 18px;
+  color: var(--gold-soft);
+}
+
+.overlay-guide-steps li + li {
+  margin-top: 8px;
+}
+
+.overlay-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.overlay-guide a {
+  color: #b7d5ff;
 }
 
 .stack-column {
@@ -868,6 +923,14 @@ button:disabled {
   font-size: clamp(1.35rem, 2vw, 1.9rem);
 }
 
+.overlay-header {
+  -webkit-app-region: drag;
+}
+
+.overlay-close-button {
+  -webkit-app-region: no-drag;
+}
+
 .overlay-map-list {
   margin-top: 14px;
 }
@@ -922,7 +985,8 @@ button:disabled {
   .session-hero,
   .capture-footer,
   .capture-panel-actions,
-  .overlay-header-meta {
+  .overlay-header-meta,
+  .overlay-launch-actions {
     flex-direction: column;
     align-items: stretch;
   }

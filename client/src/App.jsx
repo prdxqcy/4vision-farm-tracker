@@ -16,6 +16,31 @@ import {
 
 const DEFAULT_MAP_ID = MAPS[0].id;
 const INVENTORY_POPOUT_QUERY = "capture-overlay";
+const DEFAULT_OVERLAY_INSTALLER_URL = "/downloads/FarmTracks-Overlay-Setup.exe";
+const OVERLAY_INSTALLER_URL = import.meta.env.VITE_OVERLAY_INSTALLER_URL || DEFAULT_OVERLAY_INSTALLER_URL;
+const OVERLAY_PROTOCOL = "farmtracks://open-overlay";
+
+function isDesktopShellAvailable() {
+  return typeof window !== "undefined" && Boolean(window.farmtracksDesktop?.isDesktop);
+}
+
+function getRequestedMapId() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return new URLSearchParams(window.location.search).get("map") ?? "";
+}
+
+function getProtocolLaunchUrl(mapId) {
+  const launchUrl = new URL(OVERLAY_PROTOCOL);
+
+  if (mapId) {
+    launchUrl.searchParams.set("map", mapId);
+  }
+
+  return launchUrl.toString();
+}
 
 function formatDate(value) {
   return new Date(value).toLocaleString();
@@ -40,11 +65,103 @@ function buildInventoryInputs(map, snapshot = {}) {
   }, {});
 }
 
+function OverlayAccessPanel({ guideMode, installerUrl, isDesktopShell, mapName, onDismiss, onInstall, onLaunch }) {
+  const guideCopy = {
+    install: {
+      eyebrow: "Install Started",
+      title: "Set up the Windows overlay app",
+      steps: [
+        "Your browser should start downloading the FarmTracks Overlay installer.",
+        "Open the downloaded installer and approve the Windows prompt if it appears.",
+        "Leave 'Launch FarmTracks Overlay' enabled at the end of setup so the app opens immediately.",
+        "Return to this page after installation and press Launch Overlay whenever you want the in-game panel."
+      ]
+    },
+    launch: {
+      eyebrow: "Launch Requested",
+      title: "Open the overlay on this route",
+      steps: [
+        `Your browser is asking Windows to open the FarmTracks Overlay app for ${mapName}.`,
+        "If Windows shows an 'Open FarmTracks Overlay' prompt, approve it to continue.",
+        "If nothing opens, install the overlay app first and then press Launch Overlay again.",
+        "Run your game in borderless windowed mode for the always-on-top overlay to stay visible."
+      ]
+    },
+    desktop: {
+      eyebrow: "Desktop Mode",
+      title: "Open the native overlay window",
+      steps: [
+        `Press Open Overlay to launch the always-on-top panel for ${mapName}.`,
+        "Drag the overlay by its header and keep it near your game HUD.",
+        "Use borderless windowed mode in-game for the most reliable overlay behavior.",
+        "Close the overlay window any time and reopen it from this page."
+      ]
+    }
+  };
+
+  const activeGuide = guideMode ? guideCopy[guideMode] : null;
+
+  return (
+    <section className="page-panel overlay-access-panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">{isDesktopShell ? "Overlay Control" : "Overlay Access"}</p>
+          <h2>Launch the in-game panel</h2>
+          <p className="subtle-text">
+            {isDesktopShell
+              ? "This desktop build can open the native always-on-top overlay directly."
+              : "Install the Windows helper once, then come back here to open the overlay from the website."}
+          </p>
+        </div>
+        <div className="overlay-launch-actions">
+          {!isDesktopShell ? (
+            <a
+              className="secondary-button overlay-link-button"
+              href={installerUrl}
+              onClick={onInstall}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Install Overlay App
+            </a>
+          ) : null}
+          <button type="button" className="primary-button" onClick={onLaunch}>
+            {isDesktopShell ? "Open Overlay" : "Launch Overlay"}
+          </button>
+        </div>
+      </div>
+
+      {activeGuide ? (
+        <div className="overlay-guide">
+          <div className="overlay-guide-copy">
+            <p className="eyebrow">{activeGuide.eyebrow}</p>
+            <strong>{activeGuide.title}</strong>
+          </div>
+          <ol className="overlay-guide-steps">
+            {activeGuide.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          {!isDesktopShell && guideMode === "install" ? (
+            <p className="helper-text">
+              Installer URL: <a href={installerUrl}>{installerUrl}</a>
+            </p>
+          ) : null}
+          <button type="button" className="ghost-button" onClick={onDismiss}>
+            Hide instructions
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function CapturePanel({
   formMessage,
   handleCaptureRound,
   handleInventoryChange,
   inventoryInputs,
+  isDesktopShell,
   isOverlayMode,
   onOpenOverlay,
   projectedRoundGain,
@@ -65,7 +182,7 @@ function CapturePanel({
         <div className="capture-panel-actions">
           {!isOverlayMode ? (
             <button type="button" className="ghost-button" onClick={onOpenOverlay}>
-              Open pop-out
+              {isDesktopShell ? "Open overlay" : "Open pop-out"}
             </button>
           ) : null}
         </div>
@@ -181,12 +298,18 @@ function App() {
   const [players, setPlayers] = useState(() => normalizePlayersForSingleSession(loadPlayers()));
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedMapId, setSelectedMapId] = useState(() => {
+    const requestedMapId = getRequestedMapId();
     const storedMapId = loadUiState().selectedMapId;
+    if (MAPS.some((map) => map.id === requestedMapId)) {
+      return requestedMapId;
+    }
+
     return MAPS.some((map) => map.id === storedMapId) ? storedMapId : DEFAULT_MAP_ID;
   });
   const [inventoryInputs, setInventoryInputs] = useState({});
   const [storageError, setStorageError] = useState("");
   const [formMessage, setFormMessage] = useState("");
+  const [overlayGuideMode, setOverlayGuideMode] = useState("");
   const [apiState, setApiState] = useState({
     loading: true,
     error: "",
@@ -316,6 +439,7 @@ function App() {
     ? Object.values(selectedPlayer.maps).reduce((sum, mapState) => sum + mapState.rounds, 0)
     : 0;
   const mapSnapshot = splitAmount(activeSnapshotTotal);
+  const isDesktopShell = isDesktopShellAvailable();
 
   function handleInventoryChange(itemId, field, nextValue) {
     setInventoryInputs((current) => ({
@@ -329,6 +453,12 @@ function App() {
   }
 
   function handleOpenOverlay() {
+    if (isDesktopShell) {
+      setOverlayGuideMode("desktop");
+      window.farmtracksDesktop.openOverlayWindow();
+      return;
+    }
+
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set(INVENTORY_POPOUT_QUERY, "1");
 
@@ -339,6 +469,34 @@ function App() {
     );
 
     popup?.focus();
+  }
+
+  function handleInstallOverlay(event) {
+    setOverlayGuideMode("install");
+
+    if (!OVERLAY_INSTALLER_URL) {
+      event.preventDefault();
+    }
+  }
+
+  function handleLaunchOverlayApp() {
+    if (isDesktopShell) {
+      setOverlayGuideMode("desktop");
+      window.farmtracksDesktop.openOverlayWindow();
+      return;
+    }
+
+    setOverlayGuideMode("launch");
+    window.location.href = getProtocolLaunchUrl(selectedMapId);
+  }
+
+  function handleCloseOverlay() {
+    if (isDesktopShell) {
+      window.farmtracksDesktop.closeCurrentWindow();
+      return;
+    }
+
+    window.close();
   }
 
   function handleCaptureRound(event) {
@@ -403,7 +561,7 @@ function App() {
             <h1>{selectedMap.name} Capture</h1>
           </div>
           <div className="overlay-header-meta">
-            <button type="button" className="ghost-button" onClick={() => window.close()}>
+            <button type="button" className="ghost-button overlay-close-button" onClick={handleCloseOverlay}>
               Close
             </button>
           </div>
@@ -438,6 +596,7 @@ function App() {
               handleCaptureRound={handleCaptureRound}
               handleInventoryChange={handleInventoryChange}
               inventoryInputs={inventoryInputs}
+              isDesktopShell={isDesktopShell}
               isOverlayMode
               onOpenOverlay={handleOpenOverlay}
               projectedRoundGain={projectedRoundGain}
@@ -600,12 +759,23 @@ function App() {
                 </div>
               </section>
 
+              <OverlayAccessPanel
+                guideMode={overlayGuideMode}
+                installerUrl={OVERLAY_INSTALLER_URL}
+                isDesktopShell={isDesktopShell}
+                mapName={selectedMap.name}
+                onDismiss={() => setOverlayGuideMode("")}
+                onInstall={handleInstallOverlay}
+                onLaunch={handleLaunchOverlayApp}
+              />
+
               <section className="content-grid">
                 <CapturePanel
                   formMessage={formMessage}
                   handleCaptureRound={handleCaptureRound}
                   handleInventoryChange={handleInventoryChange}
                   inventoryInputs={inventoryInputs}
+                  isDesktopShell={isDesktopShell}
                   isOverlayMode={false}
                   onOpenOverlay={handleOpenOverlay}
                   projectedRoundGain={projectedRoundGain}
