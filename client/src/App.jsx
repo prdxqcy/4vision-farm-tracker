@@ -271,9 +271,6 @@ function App() {
 
             <nav className="site-nav sidebar-nav" aria-label="FarmTracks sections">
               <button type="button" className="site-nav-item active">Operations</button>
-              <button type="button" className="site-nav-item">Maps</button>
-              <button type="button" className="site-nav-item">Rounds</button>
-              <button type="button" className="site-nav-item">Archive</button>
             </nav>
 
             <section className="sidebar-panel session-identity">
@@ -435,7 +432,7 @@ function App() {
                             />
                           </label>
                           <label>
-                            <span>Loose</span>
+                            <span>Current in Bag</span>
                             <input
                               type="number"
                               min="0"

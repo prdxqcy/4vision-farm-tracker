@@ -137,9 +137,11 @@ input:focus {
 .site-status-bar {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.82rem;
+  text-align: center;
 }
 
 .live-indicator {
@@ -173,7 +175,9 @@ input:focus {
 .brand-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 100%;
 }
 
 .brand-logo {
