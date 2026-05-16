@@ -71,8 +71,15 @@ finally {
 }
 
 Write-Host "Creating or updating GitHub release $tag..."
-& $gh release view $tag *> $null
-if ($LASTEXITCODE -ne 0) {
+$releaseExists = $null
+try {
+  $releaseExists = & $gh release view $tag --json tagName 2>$null
+}
+catch {
+  $releaseExists = $null
+}
+
+if (-not $releaseExists) {
   & $gh release create $tag $assets --title $releaseTitle --generate-notes --latest
 }
 else {
