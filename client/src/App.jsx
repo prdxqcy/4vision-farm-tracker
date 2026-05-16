@@ -267,7 +267,6 @@ function App() {
               <span className={`live-indicator ${apiState.error ? "offline" : ""}`}>
                 {apiState.loading ? "Syncing" : apiState.error ? "Offline" : "Online"}
               </span>
-              <span className="status-copy">Farm route control</span>
             </div>
 
             <nav className="site-nav sidebar-nav" aria-label="FarmTracks sections">

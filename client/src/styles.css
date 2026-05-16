@@ -93,30 +93,45 @@ input:focus {
 }
 
 .shell-layout {
-  width: min(100%, 1480px);
-  margin: 0 auto;
-  padding: 6px 18px 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  gap: 24px;
+  gap: 0;
 }
 
 .site-sidebar {
   position: sticky;
-  top: 6px;
+  top: 0;
   align-self: start;
+  height: 100vh;
 }
 
 .sidebar-frame {
-  min-height: calc(100vh - 12px);
+  height: 100vh;
   padding: 22px 18px;
   display: flex;
   flex-direction: column;
   gap: 18px;
   background: linear-gradient(180deg, rgba(15, 21, 35, 0.98), rgba(12, 18, 31, 0.98));
   border-right: 1px solid rgba(236, 209, 154, 0.1);
-  border-radius: 0 0 18px 18px;
+  border-radius: 0;
   box-shadow: var(--shadow);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-frame::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-frame::-webkit-scrollbar-track {
+  background: rgba(9, 12, 19, 0.9);
+}
+
+.sidebar-frame::-webkit-scrollbar-thumb {
+  background: rgba(236, 209, 154, 0.26);
 }
 
 .site-status-bar {
@@ -206,7 +221,8 @@ input:focus {
 }
 
 .site-main {
-  padding: 32px 0 72px;
+  min-width: 0;
+  padding: 32px 28px 72px;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -214,14 +230,13 @@ input:focus {
 
 .title-panel {
   display: flex;
-  justify-content: center;
   padding-top: 8px;
 }
 
 .title-plate {
-  width: min(100%, 960px);
-  min-height: 160px;
-  padding: 30px 40px;
+  width: 100%;
+  min-height: 112px;
+  padding: 22px 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -236,8 +251,8 @@ input:focus {
 }
 
 .title-plate.compact {
-  min-height: 120px;
-  width: min(100%, 720px);
+  min-height: 108px;
+  width: 100%;
 }
 
 .eyebrow {
@@ -260,20 +275,20 @@ input:focus {
 }
 
 .title-plate h1 {
-  font-size: clamp(2rem, 4vw, 3.3rem);
-  letter-spacing: 0.12em;
+  font-size: clamp(1.45rem, 2.4vw, 2.35rem);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .title-plate h2 {
-  font-size: clamp(1.45rem, 3vw, 2.4rem);
+  font-size: clamp(1.2rem, 2.2vw, 1.9rem);
   letter-spacing: 0.08em;
 }
 
 .title-divider {
-  width: 84px;
+  width: 72px;
   height: 2px;
-  margin-top: 16px;
+  margin-top: 12px;
   background: linear-gradient(90deg, transparent, var(--gold), transparent);
 }
 
@@ -805,11 +820,14 @@ button:disabled {
 
   .site-sidebar {
     position: static;
+    height: auto;
   }
 
   .sidebar-frame {
-    min-height: auto;
+    height: auto;
+    max-height: none;
     border-radius: 0 0 18px 18px;
+    overflow: visible;
   }
 
   .sidebar-meta {
@@ -828,9 +846,7 @@ button:disabled {
 
 @media (max-width: 900px) {
   .shell-layout {
-    padding-left: 14px;
-    padding-right: 14px;
-    gap: 18px;
+    gap: 0;
   }
 
   .site-main {
@@ -851,7 +867,7 @@ button:disabled {
   }
 
   .title-plate {
-    padding: 24px 20px;
+    padding: 20px 18px;
   }
 
   .session-stats {
@@ -862,13 +878,10 @@ button:disabled {
 @media (max-width: 640px) {
   .site-main {
     padding: 24px 0 40px;
+    padding-left: 12px;
+    padding-right: 12px;
     padding-bottom: 40px;
     gap: 18px;
-  }
-
-  .shell-layout {
-    padding-left: 10px;
-    padding-right: 10px;
   }
 
   .session-stats,
