@@ -15,10 +15,14 @@ const MAX_SLOT_COUNT = 199;
 let ocrWorkerPromise = null;
 
 export const NARWASHI_AUTO_CAPTURE_ITEMS = [
-  { id: "crystals", name: "Crystal", shortName: "Crystal" },
-  { id: "arcanes", name: "Arcane", shortName: "Arcane" },
-  { id: "speed-potions", name: "Speed Potion", shortName: "Speed" }
+  { id: "crystals", name: "Crystal", shortName: "Crystal", countMode: "instances", maxMatches: 6 },
+  { id: "arcanes", name: "Arcane", shortName: "Arcane", countMode: "best-stack", maxMatches: 3 },
+  { id: "speed-potions", name: "Speed Potion", shortName: "Speed", countMode: "best-stack", maxMatches: 3 }
 ];
+
+const AUTO_CAPTURE_ITEM_RULES = Object.fromEntries(
+  NARWASHI_AUTO_CAPTURE_ITEMS.map((item) => [item.id, item])
+);
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -287,7 +291,7 @@ function scoreTemplateAtPosition(screenData, screenWidth, template, originX, ori
 }
 
 function dedupeMatches(matches) {
-  const sorted = [...matches].sort((left, right) => left.score - right.score);
+  const sorted = [...matches].sort((left, right) => getMatchQuality(left) - getMatchQuality(right));
   const kept = [];
 
   for (const match of sorted) {
@@ -303,6 +307,10 @@ function dedupeMatches(matches) {
   }
 
   return kept;
+}
+
+function getMatchQuality(match) {
+  return match.score + ((match.featureDistance ?? 0) * 0.65);
 }
 
 function resizeCanvas(sourceCanvas, width, height) {
@@ -490,7 +498,8 @@ async function findTemplateMatches(screenCanvas, profileItem) {
     }
   }
 
-  return dedupeMatches(matches).slice(0, MAX_MATCHES_PER_ITEM);
+  const itemRule = AUTO_CAPTURE_ITEM_RULES[profileItem.itemId] ?? {};
+  return dedupeMatches(matches).slice(0, itemRule.maxMatches ?? MAX_MATCHES_PER_ITEM);
 }
 
 export function loadNarwashiAutoCaptureProfile() {
@@ -561,11 +570,31 @@ export async function scanNarwashiScreen(profile, options = {}) {
     "speed-potions": 0
   };
 
-  const detailedMatches = await Promise.all(allMatches.map(async (match) => {
-    const count = await extractCountFromSlot(screenCanvas, match);
-    snapshot[match.itemId] += count;
-    return { ...match, count };
-  }));
+  const detailedMatches = [];
+
+  for (const item of NARWASHI_AUTO_CAPTURE_ITEMS) {
+    const itemMatches = allMatches
+      .filter((match) => match.itemId === item.id)
+      .sort((left, right) => getMatchQuality(left) - getMatchQuality(right));
+
+    if (item.countMode === "best-stack") {
+      const bestMatch = itemMatches[0];
+
+      if (bestMatch) {
+        const count = await extractCountFromSlot(screenCanvas, bestMatch);
+        snapshot[item.id] = count;
+        detailedMatches.push({ ...bestMatch, count });
+      }
+
+      continue;
+    }
+
+    for (const match of itemMatches.slice(0, item.maxMatches ?? MAX_MATCHES_PER_ITEM)) {
+      const count = 1;
+      snapshot[item.id] += count;
+      detailedMatches.push({ ...match, count });
+    }
+  }
 
   return {
     screenshotDataUrl,
