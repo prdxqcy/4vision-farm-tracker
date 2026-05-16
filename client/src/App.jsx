@@ -41,7 +41,6 @@ function buildInventoryInputs(map, snapshot = {}) {
 }
 
 function CapturePanel({
-  apiState,
   formMessage,
   handleCaptureRound,
   handleInventoryChange,
@@ -69,9 +68,6 @@ function CapturePanel({
               Open pop-out
             </button>
           ) : null}
-          <span className={`status-pill ${apiState.error ? "offline" : ""}`}>
-            {apiState.loading ? "API loading" : apiState.error ? "API offline" : "API ready"}
-          </span>
         </div>
       </div>
 
@@ -407,9 +403,6 @@ function App() {
             <h1>{selectedMap.name} Capture</h1>
           </div>
           <div className="overlay-header-meta">
-            <span className={`status-pill ${apiState.error ? "offline" : ""}`}>
-              {apiState.loading ? "API loading" : apiState.error ? "API offline" : "API ready"}
-            </span>
             <button type="button" className="ghost-button" onClick={() => window.close()}>
               Close
             </button>
@@ -441,7 +434,6 @@ function App() {
             </section>
 
             <CapturePanel
-              apiState={apiState}
               formMessage={formMessage}
               handleCaptureRound={handleCaptureRound}
               handleInventoryChange={handleInventoryChange}
@@ -610,7 +602,6 @@ function App() {
 
               <section className="content-grid">
                 <CapturePanel
-                  apiState={apiState}
                   formMessage={formMessage}
                   handleCaptureRound={handleCaptureRound}
                   handleInventoryChange={handleInventoryChange}
