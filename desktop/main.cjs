@@ -210,12 +210,20 @@ async function writeAhkTemplates(tempDir, profile) {
 async function runAutoHotkeyDetector(profile) {
   const autoHotkeyPath = await findAutoHotkeyPath();
   const scriptPath = getAutoHotkeyScriptPath();
+  const scriptExists = await fileExists(scriptPath);
 
-  if (!autoHotkeyPath || !(await fileExists(scriptPath))) {
+  if (!autoHotkeyPath || !scriptExists) {
     return {
       available: false,
       provider: "js-fallback",
-      matches: []
+      matches: [],
+      debug: {
+        stage: "preflight",
+        autoHotkeyPath: autoHotkeyPath || "",
+        scriptPath,
+        scriptExists,
+        reason: !autoHotkeyPath ? "autohotkey-not-found" : "script-not-found"
+      }
     };
   }
 
@@ -236,10 +244,13 @@ async function runAutoHotkeyDetector(profile) {
     });
 
     await fs.writeFile(inputPath, [configLines[0], ...entryLines].join("\n"), "utf8");
+    const startedAt = Date.now();
 
     await new Promise((resolve, reject) => {
-      execFile(autoHotkeyPath, [scriptPath, inputPath, outputPath], { windowsHide: true, timeout: 15000 }, (error) => {
+      execFile(autoHotkeyPath, [scriptPath, inputPath, outputPath], { windowsHide: true, timeout: 15000 }, (error, stdout, stderr) => {
         if (error) {
+          error.stdout = stdout;
+          error.stderr = stderr;
           reject(error);
           return;
         }
@@ -266,13 +277,34 @@ async function runAutoHotkeyDetector(profile) {
     return {
       available: true,
       provider: "autohotkey",
-      matches
+      matches,
+      debug: {
+        stage: "completed",
+        autoHotkeyPath,
+        scriptPath,
+        scriptExists,
+        runtimeMs: Date.now() - startedAt,
+        rawLineCount: lines.length,
+        rawOutputPreview: lines.slice(0, 6),
+        matchCount: matches.length,
+        reason: matches.length > 0 ? "matches-found" : "no-matches-returned"
+      }
     };
-  } catch (_error) {
+  } catch (error) {
     return {
       available: false,
       provider: "js-fallback",
-      matches: []
+      matches: [],
+      debug: {
+        stage: "failed",
+        autoHotkeyPath,
+        scriptPath,
+        scriptExists,
+        reason: "execution-failed",
+        errorMessage: error instanceof Error ? error.message : String(error),
+        stderr: typeof error?.stderr === "string" ? error.stderr.trim() : "",
+        stdout: typeof error?.stdout === "string" ? error.stdout.trim() : ""
+      }
     };
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -410,7 +442,8 @@ ipcMain.handle("farmtracks:detect-auto-capture", async (event, profile, options 
     return {
       screenshotDataUrl: `data:image/png;base64,${image.toString("base64")}`,
       provider: detection.provider,
-      matches: detection.matches
+      matches: detection.matches,
+      debug: detection.debug ?? null
     };
   } finally {
     if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {

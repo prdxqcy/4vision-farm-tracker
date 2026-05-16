@@ -702,6 +702,12 @@ export async function scanNarwashiScreen(profile, options = {}) {
   let detectedScanRegion = null;
   let allMatches = [];
   let provider = "js-fallback";
+  const debug = {
+    desktopDetection: desktopDetection?.debug ?? null,
+    fallbackReason: "",
+    jsMatchCount: 0,
+    ahkMatchCount: Array.isArray(desktopDetection?.matches) ? desktopDetection.matches.length : 0
+  };
 
   if (desktopDetection?.provider === "autohotkey" && Array.isArray(desktopDetection.matches) && desktopDetection.matches.length > 0) {
     provider = "autohotkey";
@@ -720,6 +726,7 @@ export async function scanNarwashiScreen(profile, options = {}) {
     );
     detectedScanRegion = getMatchBounds(allMatches);
   } else {
+    debug.fallbackReason = desktopDetection?.debug?.reason || "desktop-detection-unavailable";
     detectedScanRegion = detectBagScanRegion(fullScreenCanvas);
     const activeRegion = detectedScanRegion ?? profile.scanRegion ?? { x: 0, y: 0 };
     const screenCanvas = cropCanvasRegion(fullScreenCanvas, detectedScanRegion ?? profile.scanRegion);
@@ -736,6 +743,8 @@ export async function scanNarwashiScreen(profile, options = {}) {
         }))
       );
     }
+
+    debug.jsMatchCount = allMatches.length;
   }
 
   const snapshot = {
@@ -782,6 +791,7 @@ export async function scanNarwashiScreen(profile, options = {}) {
   return {
     screenshotDataUrl,
     provider,
+    debug,
     scanRegion: detectedScanRegion ?? profile.scanRegion ?? null,
     matches: detailedMatches,
     snapshot

@@ -645,6 +645,22 @@ input:focus {
   gap: 12px;
 }
 
+.auto-capture-debug {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(236, 209, 154, 0.14);
+  background: rgba(9, 11, 16, 0.72);
+}
+
+.auto-capture-debug-line {
+  margin: 0;
+  word-break: break-word;
+}
+
+.auto-capture-debug-line + .auto-capture-debug-line {
+  margin-top: 6px;
+}
+
 .auto-capture-modal-backdrop {
   position: fixed;
   inset: 0;

@@ -85,6 +85,54 @@ function buildGuideTranslationUrl(language, guideText) {
   return translateUrl.toString();
 }
 
+function formatAutoCaptureDebugLines(lastResult) {
+  if (!lastResult?.debug) {
+    return [];
+  }
+
+  const lines = [];
+  const desktopDebug = lastResult.debug.desktopDetection;
+
+  lines.push(`Detector: ${lastResult.provider === "autohotkey" ? "AutoHotkey" : "Built-in scanner"}`);
+
+  if (desktopDebug) {
+    lines.push(`AHK stage: ${desktopDebug.stage || "unknown"}`);
+
+    if (desktopDebug.reason) {
+      lines.push(`AHK reason: ${desktopDebug.reason}`);
+    }
+
+    if (desktopDebug.matchCount !== undefined) {
+      lines.push(`AHK matches: ${desktopDebug.matchCount}`);
+    }
+
+    if (desktopDebug.runtimeMs !== undefined) {
+      lines.push(`AHK runtime: ${desktopDebug.runtimeMs}ms`);
+    }
+
+    if (desktopDebug.autoHotkeyPath) {
+      lines.push(`AHK exe: ${desktopDebug.autoHotkeyPath}`);
+    }
+
+    if (desktopDebug.errorMessage) {
+      lines.push(`AHK error: ${desktopDebug.errorMessage}`);
+    }
+
+    if (desktopDebug.stderr) {
+      lines.push(`AHK stderr: ${desktopDebug.stderr}`);
+    }
+  } else {
+    lines.push("AHK stage: desktop bridge unavailable");
+  }
+
+  if (lastResult.provider !== "autohotkey" && lastResult.debug.fallbackReason) {
+    lines.push(`Fallback: ${lastResult.debug.fallbackReason}`);
+    lines.push(`Built-in matches: ${lastResult.debug.jsMatchCount}`);
+  }
+
+  return lines;
+}
+
 function splitAmount(total) {
   return {
     stacks: Math.floor(total / STACK_SIZE),
@@ -359,6 +407,8 @@ function AutoCapturePanel({
   onClearCalibration,
   onStartCalibration
 }) {
+  const debugLines = formatAutoCaptureDebugLines(lastResult);
+
   return (
     <section className="page-panel auto-capture-panel">
       <div className="panel-header">
@@ -398,24 +448,35 @@ function AutoCapturePanel({
       {message ? <p className="helper-text auto-capture-message">{message}</p> : null}
 
       {lastResult ? (
-        <div className="auto-capture-results">
-          <div className="meta-entry">
-            <span>Last scan</span>
-            <strong>{lastResult.matches.length} matched slots</strong>
+        <>
+          <div className="auto-capture-results">
+            <div className="meta-entry">
+              <span>Last scan</span>
+              <strong>{lastResult.matches.length} matched slots</strong>
+            </div>
+            <div className="meta-entry">
+              <span>Crystals</span>
+              <strong>{lastResult.snapshot.crystals}</strong>
+            </div>
+            <div className="meta-entry">
+              <span>Arcanes</span>
+              <strong>{lastResult.snapshot.arcanes}</strong>
+            </div>
+            <div className="meta-entry">
+              <span>Speed Potions</span>
+              <strong>{lastResult.snapshot["speed-potions"]}</strong>
+            </div>
           </div>
-          <div className="meta-entry">
-            <span>Crystals</span>
-            <strong>{lastResult.snapshot.crystals}</strong>
-          </div>
-          <div className="meta-entry">
-            <span>Arcanes</span>
-            <strong>{lastResult.snapshot.arcanes}</strong>
-          </div>
-          <div className="meta-entry">
-            <span>Speed Potions</span>
-            <strong>{lastResult.snapshot["speed-potions"]}</strong>
-          </div>
-        </div>
+          {debugLines.length ? (
+            <div className="auto-capture-debug">
+              {debugLines.map((line) => (
+                <p key={line} className="helper-text auto-capture-debug-line">
+                  {line}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </>
       ) : null}
     </section>
   );
