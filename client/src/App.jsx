@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { MAPS, STACK_SIZE } from "./mapConfig";
-import { loadPlayers, savePlayers } from "./storage";
+import { loadPlayers, loadUiState, savePlayers, saveUiState } from "./storage";
 import {
   applyRound,
   createNewPlayer,
@@ -15,6 +15,7 @@ import {
 } from "./utils";
 
 const DEFAULT_MAP_ID = MAPS[0].id;
+const INVENTORY_POPOUT_QUERY = "capture-overlay";
 
 function formatDate(value) {
   return new Date(value).toLocaleString();
@@ -37,6 +38,106 @@ function buildInventoryInputs(map, snapshot = {}) {
     };
     return accumulator;
   }, {});
+}
+
+function CapturePanel({
+  apiState,
+  formMessage,
+  handleCaptureRound,
+  handleInventoryChange,
+  inventoryInputs,
+  isOverlayMode,
+  onOpenOverlay,
+  projectedRoundGain,
+  roundGains,
+  selectedMap,
+  selectedSession,
+  nextRoundNumber
+}) {
+  return (
+    <form className={`page-panel capture-panel ${isOverlayMode ? "capture-panel-overlay" : ""}`} onSubmit={handleCaptureRound}>
+      <div className="panel-header">
+        <div>
+          <h2>Capture Current Inventory</h2>
+          <p className="subtle-text">
+            Enter current stack counts after each route clear. FarmTracks calculates the round gain.
+          </p>
+        </div>
+        <div className="capture-panel-actions">
+          {!isOverlayMode ? (
+            <button type="button" className="ghost-button" onClick={onOpenOverlay}>
+              Open pop-out
+            </button>
+          ) : null}
+          <span className={`status-pill ${apiState.error ? "offline" : ""}`}>
+            {apiState.loading ? "API loading" : apiState.error ? "API offline" : "API ready"}
+          </span>
+        </div>
+      </div>
+
+      {isOverlayMode ? (
+        <div className="overlay-banner">
+          <strong>{selectedMap.name}</strong>
+          <span>Keep this window beside the game and pin it with your OS if needed.</span>
+        </div>
+      ) : null}
+
+      <div className="checkpoint-grid">
+        {selectedMap.items.map((item) => (
+          <div key={item.id} className="checkpoint-card">
+            <div className="checkpoint-copy">
+              <strong>{item.name}</strong>
+              <span>
+                Saved bag state: {splitAmount(selectedSession?.currentSnapshot?.[item.id] ?? 0).stacks} stacks,
+                {" "}
+                {splitAmount(selectedSession?.currentSnapshot?.[item.id] ?? 0).loose} loose
+              </span>
+            </div>
+
+            <div className="checkpoint-fields">
+              <label>
+                <span>Stacks</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={inventoryInputs[item.id]?.stacks ?? ""}
+                  onChange={(event) => handleInventoryChange(item.id, "stacks", event.target.value)}
+                  placeholder="0"
+                />
+              </label>
+              <label>
+                <span>Current in Bag</span>
+                <input
+                  type="number"
+                  min="0"
+                  max={STACK_SIZE - 1}
+                  step="1"
+                  value={inventoryInputs[item.id]?.loose ?? ""}
+                  onChange={(event) => handleInventoryChange(item.id, "loose", event.target.value)}
+                  placeholder="0"
+                />
+              </label>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="capture-footer">
+        <div>
+          <p className="helper-text">
+            {projectedRoundGain > 0
+              ? `This checkpoint will record +${projectedRoundGain} items for round ${nextRoundNumber}.`
+              : "Increase at least one count to capture a new round."}
+          </p>
+          {formMessage ? <p className="feedback-text">{formMessage}</p> : null}
+        </div>
+        <button type="submit" className="primary-button" disabled={!hasPositiveGain(roundGains)}>
+          Capture round
+        </button>
+      </div>
+    </form>
+  );
 }
 
 function normalizePlayersForSingleSession(players) {
@@ -77,9 +178,16 @@ function RoundTrendChart({ history }) {
 }
 
 function App() {
+  const isOverlayMode = useMemo(
+    () => new URLSearchParams(window.location.search).has(INVENTORY_POPOUT_QUERY),
+    []
+  );
   const [players, setPlayers] = useState(() => normalizePlayersForSingleSession(loadPlayers()));
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
-  const [selectedMapId, setSelectedMapId] = useState(DEFAULT_MAP_ID);
+  const [selectedMapId, setSelectedMapId] = useState(() => {
+    const storedMapId = loadUiState().selectedMapId;
+    return MAPS.some((map) => map.id === storedMapId) ? storedMapId : DEFAULT_MAP_ID;
+  });
   const [inventoryInputs, setInventoryInputs] = useState({});
   const [storageError, setStorageError] = useState("");
   const [formMessage, setFormMessage] = useState("");
@@ -136,6 +244,25 @@ function App() {
   }, [players, selectedPlayerId]);
 
   useEffect(() => {
+    function handleStorage(event) {
+      if (event.key === "farmtracks.players.v1") {
+        setPlayers(normalizePlayersForSingleSession(loadPlayers()));
+      }
+
+      if (event.key === "farmtracks.ui.v1") {
+        const nextMapId = loadUiState().selectedMapId;
+
+        if (MAPS.some((map) => map.id === nextMapId)) {
+          setSelectedMapId(nextMapId);
+        }
+      }
+    }
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  useEffect(() => {
     let ignore = false;
 
     async function fetchMetadata() {
@@ -178,6 +305,10 @@ function App() {
     setFormMessage("");
   }, [selectedMapId, selectedPlayerId, selectedSession?.rounds]);
 
+  useEffect(() => {
+    saveUiState({ selectedMapId });
+  }, [selectedMapId]);
+
   const nextRoundNumber = (selectedSession?.rounds ?? 0) + 1;
   const sessionTotal = getTotalItems(selectedSession?.totals ?? {});
   const activeSnapshotTotal = getTotalItems(selectedSession?.currentSnapshot ?? {});
@@ -199,6 +330,19 @@ function App() {
       }
     }));
     setFormMessage("");
+  }
+
+  function handleOpenOverlay() {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set(INVENTORY_POPOUT_QUERY, "1");
+
+    const popup = window.open(
+      nextUrl.toString(),
+      "farmtracks-capture-overlay",
+      "popup=yes,width=560,height=860,resizable=yes,scrollbars=yes"
+    );
+
+    popup?.focus();
   }
 
   function handleCaptureRound(event) {
@@ -252,6 +396,77 @@ function App() {
       )
     );
     setFormMessage(`Current session reset for ${selectedPlayer.name}.`);
+  }
+
+  if (isOverlayMode) {
+    return (
+      <main className="overlay-shell">
+        <section className="overlay-header page-panel">
+          <div>
+            <p className="eyebrow">FarmTracks Overlay</p>
+            <h1>{selectedMap.name} Capture</h1>
+          </div>
+          <div className="overlay-header-meta">
+            <span className={`status-pill ${apiState.error ? "offline" : ""}`}>
+              {apiState.loading ? "API loading" : apiState.error ? "API offline" : "API ready"}
+            </span>
+            <button type="button" className="ghost-button" onClick={() => window.close()}>
+              Close
+            </button>
+          </div>
+        </section>
+
+        {selectedPlayer ? (
+          <>
+            <section className="overlay-map-switcher page-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Route</h2>
+                  <p className="subtle-text">Switch the active farming route without touching the main window.</p>
+                </div>
+              </div>
+              <div className="sidebar-map-list overlay-map-list" role="tablist" aria-label="Map selector">
+                {MAPS.map((map) => (
+                  <button
+                    key={map.id}
+                    type="button"
+                    className={`sidebar-map-item ${map.id === selectedMapId ? "active" : ""}`}
+                    onClick={() => setSelectedMapId(map.id)}
+                  >
+                    <strong>{map.name}</strong>
+                    <span>{map.subtitle}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <CapturePanel
+              apiState={apiState}
+              formMessage={formMessage}
+              handleCaptureRound={handleCaptureRound}
+              handleInventoryChange={handleInventoryChange}
+              inventoryInputs={inventoryInputs}
+              isOverlayMode
+              onOpenOverlay={handleOpenOverlay}
+              projectedRoundGain={projectedRoundGain}
+              roundGains={roundGains}
+              selectedMap={selectedMap}
+              selectedSession={selectedSession}
+              nextRoundNumber={nextRoundNumber}
+            />
+          </>
+        ) : (
+          <section className="page-panel onboarding-panel">
+            <div className="title-plate compact">
+              <p className="eyebrow">Ready Room</p>
+              <h2>Preparing Local Session</h2>
+              <div className="title-divider" />
+            </div>
+            <p className="subtle-text">FarmTracks is preparing the overlay session.</p>
+          </section>
+        )}
+      </main>
+    );
   }
 
   return (
@@ -394,74 +609,20 @@ function App() {
               </section>
 
               <section className="content-grid">
-                <form className="page-panel capture-panel" onSubmit={handleCaptureRound}>
-                  <div className="panel-header">
-                    <div>
-                      <h2>Capture Current Inventory</h2>
-                      <p className="subtle-text">
-                        Enter current stack counts after each route clear. FarmTracks calculates the round gain.
-                      </p>
-                    </div>
-                    <span className={`status-pill ${apiState.error ? "offline" : ""}`}>
-                      {apiState.loading ? "API loading" : apiState.error ? "API offline" : "API ready"}
-                    </span>
-                  </div>
-
-                  <div className="checkpoint-grid">
-                    {selectedMap.items.map((item) => (
-                      <div key={item.id} className="checkpoint-card">
-                        <div className="checkpoint-copy">
-                          <strong>{item.name}</strong>
-                          <span>
-                            Saved bag state: {splitAmount(selectedSession?.currentSnapshot?.[item.id] ?? 0).stacks} stacks,
-                            {" "}
-                            {splitAmount(selectedSession?.currentSnapshot?.[item.id] ?? 0).loose} loose
-                          </span>
-                        </div>
-
-                        <div className="checkpoint-fields">
-                          <label>
-                            <span>Stacks</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={inventoryInputs[item.id]?.stacks ?? ""}
-                              onChange={(event) => handleInventoryChange(item.id, "stacks", event.target.value)}
-                              placeholder="0"
-                            />
-                          </label>
-                          <label>
-                            <span>Current in Bag</span>
-                            <input
-                              type="number"
-                              min="0"
-                              max={STACK_SIZE - 1}
-                              step="1"
-                              value={inventoryInputs[item.id]?.loose ?? ""}
-                              onChange={(event) => handleInventoryChange(item.id, "loose", event.target.value)}
-                              placeholder="0"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="capture-footer">
-                    <div>
-                      <p className="helper-text">
-                        {projectedRoundGain > 0
-                          ? `This checkpoint will record +${projectedRoundGain} items for round ${nextRoundNumber}.`
-                          : "Increase at least one count to capture a new round."}
-                      </p>
-                      {formMessage ? <p className="feedback-text">{formMessage}</p> : null}
-                    </div>
-                    <button type="submit" className="primary-button" disabled={!hasPositiveGain(roundGains)}>
-                      Capture round
-                    </button>
-                  </div>
-                </form>
+                <CapturePanel
+                  apiState={apiState}
+                  formMessage={formMessage}
+                  handleCaptureRound={handleCaptureRound}
+                  handleInventoryChange={handleInventoryChange}
+                  inventoryInputs={inventoryInputs}
+                  isOverlayMode={false}
+                  onOpenOverlay={handleOpenOverlay}
+                  projectedRoundGain={projectedRoundGain}
+                  roundGains={roundGains}
+                  selectedMap={selectedMap}
+                  selectedSession={selectedSession}
+                  nextRoundNumber={nextRoundNumber}
+                />
 
                 <div className="stack-column">
                   <article className="page-panel insight-panel">

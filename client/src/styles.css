@@ -200,6 +200,15 @@ input:focus {
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
+.capture-panel-actions,
+.overlay-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .sidebar-nav {
   margin-top: 6px;
 }
@@ -579,6 +588,26 @@ input:focus {
   gap: 14px;
 }
 
+.overlay-banner {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(70, 143, 247, 0.22);
+  background: rgba(47, 124, 255, 0.12);
+}
+
+.overlay-banner strong {
+  font-family: "Marcellus", serif;
+  color: #fff0cf;
+}
+
+.overlay-banner span {
+  color: var(--gold-faint);
+}
+
 .checkpoint-card,
 .record-card {
   border: 1px solid var(--border-soft);
@@ -817,6 +846,37 @@ button:disabled {
   font-weight: 500;
 }
 
+.overlay-shell {
+  min-height: 100vh;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.overlay-header,
+.overlay-map-switcher,
+.capture-panel-overlay {
+  padding: 18px 20px;
+}
+
+.overlay-header h1 {
+  margin: 4px 0 0;
+  color: var(--gold);
+  font-family: "Cinzel Decorative", serif;
+  font-weight: 400;
+  font-size: clamp(1.35rem, 2vw, 1.9rem);
+}
+
+.overlay-map-list {
+  margin-top: 14px;
+}
+
+.capture-panel-overlay .checkpoint-grid {
+  margin-top: 18px;
+  grid-template-columns: 1fr;
+}
+
 @media (max-width: 1180px) {
   .shell-layout {
     grid-template-columns: 1fr;
@@ -860,7 +920,9 @@ button:disabled {
 
   .panel-header,
   .session-hero,
-  .capture-footer {
+  .capture-footer,
+  .capture-panel-actions,
+  .overlay-header-meta {
     flex-direction: column;
     align-items: stretch;
   }
@@ -904,5 +966,9 @@ button:disabled {
 
   .record-head {
     flex-direction: column;
+  }
+
+  .overlay-shell {
+    padding: 12px;
   }
 }

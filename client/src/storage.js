@@ -2,6 +2,7 @@ import { MAPS } from "./mapConfig";
 import { createEmptyMapState } from "./utils";
 
 const STORAGE_KEY = "farmtracks.players.v1";
+const UI_STORAGE_KEY = "farmtracks.ui.v1";
 
 function createEmptyTotals(items) {
   return items.reduce((accumulator, item) => {
@@ -144,5 +145,32 @@ export function savePlayers(players) {
     return "";
   } catch (error) {
     return error instanceof Error ? error.message : "Unable to save player data in this browser.";
+  }
+}
+
+export function loadUiState() {
+  try {
+    const raw = window.localStorage.getItem(UI_STORAGE_KEY);
+
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveUiState(nextState) {
+  const currentState = loadUiState();
+  const mergedState = { ...currentState, ...nextState };
+
+  try {
+    window.localStorage.setItem(UI_STORAGE_KEY, JSON.stringify(mergedState));
+    return "";
+  } catch (error) {
+    return error instanceof Error ? error.message : "Unable to save interface preferences in this browser.";
   }
 }
