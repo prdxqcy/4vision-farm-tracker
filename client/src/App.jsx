@@ -39,6 +39,17 @@ function buildInventoryInputs(map, snapshot = {}) {
   }, {});
 }
 
+function normalizePlayersForSingleSession(players) {
+  if (!Array.isArray(players) || players.length === 0) {
+    return [createNewPlayer("Local Session")];
+  }
+
+  const primaryPlayer = structuredClone(players[0]);
+  primaryPlayer.name = "Local Session";
+
+  return [primaryPlayer];
+}
+
 function RoundTrendChart({ history }) {
   const points = [...history].reverse().map((entry) => getTotalItems(entry.gains));
   const maxValue = Math.max(...points, 1);
@@ -66,7 +77,7 @@ function RoundTrendChart({ history }) {
 }
 
 function App() {
-  const [players, setPlayers] = useState(() => loadPlayers());
+  const [players, setPlayers] = useState(() => normalizePlayersForSingleSession(loadPlayers()));
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedMapId, setSelectedMapId] = useState(DEFAULT_MAP_ID);
   const [inventoryInputs, setInventoryInputs] = useState({});
@@ -104,6 +115,11 @@ function App() {
       const localPlayer = createNewPlayer("Local Session");
       setPlayers([localPlayer]);
       setSelectedPlayerId(localPlayer.id);
+      return;
+    }
+
+    if (players.length > 1 || players[0]?.name !== "Local Session") {
+      setPlayers(normalizePlayersForSingleSession(players));
       return;
     }
 
@@ -296,21 +312,6 @@ function App() {
                 <span>{map.subtitle}</span>
               </button>
             ))}
-          </div>
-        </section>
-
-        <section className="page-panel roster-panel">
-          <div className="panel-header">
-            <div>
-              <h2>Browser Profile</h2>
-              <p className="subtle-text">
-                This tracker now uses one local session profile per browser, so there is no player-name setup.
-              </p>
-            </div>
-            <div className="profile-badge">
-              <span>Profile</span>
-              <strong>{selectedPlayer?.name ?? "Preparing local session"}</strong>
-            </div>
           </div>
         </section>
 
