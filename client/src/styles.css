@@ -903,10 +903,16 @@ button:disabled {
 
 .overlay-shell {
   min-height: 100vh;
-  padding: 18px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
+}
+
+.overlay-shell .page-panel {
+  background: linear-gradient(180deg, rgba(12, 14, 18, 0.56), rgba(14, 16, 20, 0.46));
+  border-color: rgba(236, 209, 154, 0.24);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.24);
 }
 
 .overlay-header,
@@ -924,6 +930,10 @@ button:disabled {
 }
 
 .overlay-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   -webkit-app-region: drag;
 }
 
@@ -939,14 +949,22 @@ button:disabled {
   font-weight: 400;
 }
 
+.overlay-header-meta {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .overlay-opacity-control {
   -webkit-app-region: no-drag;
-  min-width: 170px;
+  min-width: 132px;
+  max-width: 148px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   color: var(--gold-faint);
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -960,6 +978,12 @@ button:disabled {
 
 .overlay-close-button {
   -webkit-app-region: no-drag;
+  flex-shrink: 0;
+}
+
+.overlay-header-meta .ghost-button {
+  padding: 9px 12px;
+  font-size: 0.9rem;
 }
 
 .overlay-map-list {
@@ -1016,10 +1040,17 @@ button:disabled {
   .session-hero,
   .capture-footer,
   .capture-panel-actions,
-  .overlay-header-meta,
   .overlay-launch-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .overlay-header {
+    align-items: stretch;
+  }
+
+  .overlay-header-meta {
+    justify-content: space-between;
   }
 
   .checkpoint-grid,
@@ -1065,5 +1096,9 @@ button:disabled {
 
   .overlay-shell {
     padding: 12px;
+  }
+
+  .overlay-header-meta {
+    flex-wrap: wrap;
   }
 }
