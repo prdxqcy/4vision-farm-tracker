@@ -118,10 +118,6 @@ function createMainWindow() {
   mainWindow.loadURL(buildAppUrl());
   mainWindow.on("closed", () => {
     mainWindow = null;
-
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.close();
-    }
   });
 }
 
