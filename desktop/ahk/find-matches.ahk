@@ -28,7 +28,7 @@ for index, line in lines {
 
   parts := StrSplit(line, "|")
 
-  if (parts.Length < 7) {
+  if (parts.Length < 6) {
     continue
   }
 
