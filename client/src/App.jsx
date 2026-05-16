@@ -27,6 +27,19 @@ const INVENTORY_POPOUT_QUERY = "capture-overlay";
 const DEFAULT_OVERLAY_INSTALLER_URL = "https://github.com/prdxqcy/4vision-farm-tracker/releases/latest/download/FarmTracks-Overlay-Setup.exe";
 const OVERLAY_INSTALLER_URL = import.meta.env.VITE_OVERLAY_INSTALLER_URL || DEFAULT_OVERLAY_INSTALLER_URL;
 const OVERLAY_PROTOCOL = "farmtracks://open-overlay";
+const ONBOARDING_VERSION = "2026-05-16";
+const GUIDE_TRANSLATION_LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Spanish" },
+  { value: "pt", label: "Portuguese" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "it", label: "Italian" },
+  { value: "pl", label: "Polish" },
+  { value: "tr", label: "Turkish" },
+  { value: "ru", label: "Russian" },
+  { value: "ar", label: "Arabic" }
+];
 
 function isDesktopShellAvailable() {
   return typeof window !== "undefined" && Boolean(window.farmtracksDesktop?.isDesktop);
@@ -61,6 +74,15 @@ function triggerDesktopProtocol(url) {
 
 function formatDate(value) {
   return new Date(value).toLocaleString();
+}
+
+function buildGuideTranslationUrl(language, guideText) {
+  const translateUrl = new URL("https://translate.google.com/");
+  translateUrl.searchParams.set("sl", "auto");
+  translateUrl.searchParams.set("tl", language);
+  translateUrl.searchParams.set("text", guideText);
+  translateUrl.searchParams.set("op", "translate");
+  return translateUrl.toString();
 }
 
 function splitAmount(total) {
@@ -204,6 +226,129 @@ function OverlayAccessPanel({ guideMode, installerUrl, isDesktopShell, mapName, 
         </div>
       ) : null}
     </section>
+  );
+}
+
+function WelcomeGuideModal({
+  installerUrl,
+  isDesktopShell,
+  language,
+  mapName,
+  onClose,
+  onInstall,
+  onLanguageChange,
+  onLaunchOverlay
+}) {
+  const guideText = [
+    "FarmTracks quick guide.",
+    "Step 1: Choose your farming route from the left sidebar.",
+    "Step 2: After each route clear, enter the current item counts from your bag into the tracker.",
+    "Step 3: Press Capture round to save the gain for that run.",
+    "Step 4: Use Finish session when you want to archive the current run and start a clean one.",
+    "Auto-capture guide.",
+    "Auto-capture is available in the installed desktop app for Narwashi.",
+    "Press Calibrate once and click one crystal, one arcane, and one speed potion on the captured screenshot.",
+    "After calibration, Auto-fill reads visible open bags and fills the bag counts for you.",
+    "Auto-capture round reads the bags and records the round immediately when the values increased.",
+    "Overlay guide.",
+    "The installed desktop app gives you the best overlay experience and opens a native always-on-top window beside the game.",
+    "For the smoothest overlay, run the game in borderless windowed mode and keep your bags visible during auto-capture.",
+    `Current route: ${mapName}.`
+  ].join(" ");
+
+  function handleTranslateGuide() {
+    window.open(buildGuideTranslationUrl(language, guideText), "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <div className="auto-capture-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="welcome-guide-title">
+      <div className="welcome-guide-modal page-panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Welcome to FarmTracks</p>
+            <h2 id="welcome-guide-title">How the tracker and overlay work</h2>
+            <p className="subtle-text">
+              This quick start shows how to track runs manually, when auto-capture works, and why the desktop app gives
+              the most reliable overlay experience.
+            </p>
+          </div>
+          <div className="overlay-launch-actions">
+            {!isDesktopShell ? (
+              <a
+                className="secondary-button overlay-link-button"
+                href={installerUrl}
+                onClick={onInstall}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Download Desktop App
+              </a>
+            ) : (
+              <button type="button" className="secondary-button" onClick={onLaunchOverlay}>
+                Open Overlay
+              </button>
+            )}
+            <button type="button" className="ghost-button" onClick={onClose}>
+              Start using FarmTracks
+            </button>
+          </div>
+        </div>
+
+        <div className="welcome-guide-toolbar">
+          <label className="welcome-guide-language">
+            <span>Translate instructions</span>
+            <select value={language} onChange={(event) => onLanguageChange(event.target.value)}>
+              {GUIDE_TRANSLATION_LANGUAGES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="ghost-button" onClick={handleTranslateGuide}>
+            Open in Google Translate
+          </button>
+        </div>
+
+        <div className="welcome-guide-grid">
+          <article className="welcome-guide-card">
+            <p className="eyebrow">Manual Tracking</p>
+            <h3>Self-use the tracker in four steps</h3>
+            <ol className="overlay-guide-steps">
+              <li>Choose your route from the left sidebar.</li>
+              <li>Keep farming, then open your bag after each clear.</li>
+              <li>Enter the current bag counts and press <code>Capture round</code>.</li>
+              <li>Press <code>Finish session</code> when you want to archive the run and start fresh.</li>
+            </ol>
+          </article>
+
+          <article className="welcome-guide-card">
+            <p className="eyebrow">Auto Capture</p>
+            <h3>How the smart scan works</h3>
+            <ol className="overlay-guide-steps">
+              <li>Auto-capture currently works inside the desktop app for Narwashi.</li>
+              <li>Press <code>Calibrate</code> once and click one crystal, one arcane, and one speed potion.</li>
+              <li><code>Auto-fill</code> reads visible bag slots and fills the counts without saving a round yet.</li>
+              <li><code>Auto-capture round</code> reads the bag and records the round automatically when counts increased.</li>
+            </ol>
+          </article>
+
+          <article className="welcome-guide-card welcome-guide-card-accent">
+            <p className="eyebrow">Best Experience</p>
+            <h3>Use the desktop app for the flawless overlay</h3>
+            <p className="subtle-text">
+              The website is perfect for manual tracking, but the installed app gives you the native always-on-top
+              overlay, better screen capture support, and the smoothest in-game workflow.
+            </p>
+            <ul className="welcome-guide-list">
+              <li>Run the game in borderless windowed mode.</li>
+              <li>Keep bags visible while scanning.</li>
+              <li>Open the overlay beside your game HUD and leave the dashboard in the background.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -514,6 +659,15 @@ function App() {
   const [autoCaptureMessage, setAutoCaptureMessage] = useState("");
   const [autoCaptureResult, setAutoCaptureResult] = useState(null);
   const [calibrationSession, setCalibrationSession] = useState(null);
+  const [guideLanguage, setGuideLanguage] = useState(() => loadUiState().guideLanguage || "en");
+  const [showWelcomeGuide, setShowWelcomeGuide] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    const uiState = loadUiState();
+    return !new URLSearchParams(window.location.search).has(INVENTORY_POPOUT_QUERY) && uiState.seenOnboardingVersion !== ONBOARDING_VERSION;
+  });
   const [apiState, setApiState] = useState({
     loading: true,
     error: "",
@@ -632,6 +786,10 @@ function App() {
     saveUiState({ selectedMapId });
   }, [selectedMapId]);
 
+  useEffect(() => {
+    saveUiState({ guideLanguage });
+  }, [guideLanguage]);
+
   const nextRoundNumber = (selectedSession?.rounds ?? 0) + 1;
   const sessionTotal = getTotalItems(selectedSession?.totals ?? {});
   const activeSnapshotTotal = getTotalItems(selectedSession?.currentSnapshot ?? {});
@@ -720,6 +878,11 @@ function App() {
 
     setOverlayGuideMode("launch");
     triggerDesktopProtocol(getProtocolLaunchUrl(selectedMapId));
+  }
+
+  function handleDismissWelcomeGuide() {
+    setShowWelcomeGuide(false);
+    saveUiState({ seenOnboardingVersion: ONBOARDING_VERSION });
   }
 
   function handleCloseOverlay() {
@@ -1065,6 +1228,9 @@ function App() {
                   </div>
 
                   <div className="hero-actions">
+                    <button type="button" className="ghost-button" onClick={() => setShowWelcomeGuide(true)}>
+                      How it works
+                    </button>
                     <button
                       type="button"
                       className="secondary-button"
@@ -1281,6 +1447,18 @@ function App() {
           onCancel={() => setCalibrationSession(null)}
           onRetake={handleRetakeAutoCaptureCalibration}
           onSelect={handleSelectCalibrationPoint}
+        />
+      ) : null}
+      {showWelcomeGuide ? (
+        <WelcomeGuideModal
+          installerUrl={OVERLAY_INSTALLER_URL}
+          isDesktopShell={isDesktopShell}
+          language={guideLanguage}
+          mapName={selectedMap.name}
+          onClose={handleDismissWelcomeGuide}
+          onInstall={handleInstallOverlay}
+          onLanguageChange={setGuideLanguage}
+          onLaunchOverlay={handleLaunchOverlayApp}
         />
       ) : null}
     </div>

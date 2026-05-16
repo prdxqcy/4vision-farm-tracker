@@ -667,6 +667,87 @@ input:focus {
   overflow: auto;
 }
 
+.welcome-guide-modal {
+  width: min(1180px, 100%);
+  max-height: calc(100vh - 48px);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: auto;
+  border: 1px solid rgba(236, 209, 154, 0.28);
+  background:
+    linear-gradient(160deg, rgba(16, 24, 41, 0.96), rgba(11, 14, 20, 0.96)),
+    radial-gradient(circle at top right, rgba(70, 143, 247, 0.14), transparent 24%);
+}
+
+.welcome-guide-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(236, 209, 154, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.welcome-guide-language {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--gold-soft);
+}
+
+.welcome-guide-language select {
+  min-width: 210px;
+  border: 1px solid rgba(236, 209, 154, 0.24);
+  border-radius: 10px;
+  padding: 11px 13px;
+  color: var(--gold);
+  background: rgba(15, 15, 15, 0.94);
+}
+
+.welcome-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.welcome-guide-card {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(236, 209, 154, 0.14);
+  background: rgba(12, 13, 17, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.welcome-guide-card h3 {
+  margin: 0 0 10px;
+  font-family: "Marcellus", serif;
+  font-size: 1.18rem;
+  color: #fff1cc;
+}
+
+.welcome-guide-card-accent {
+  background:
+    linear-gradient(180deg, rgba(47, 124, 255, 0.14), rgba(14, 17, 22, 0.72)),
+    rgba(12, 13, 17, 0.72);
+  border-color: rgba(70, 143, 247, 0.24);
+}
+
+.welcome-guide-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--gold-soft);
+}
+
+.welcome-guide-list li + li {
+  margin-top: 8px;
+}
+
 .auto-capture-image-shell {
   position: relative;
   border-radius: 18px;
@@ -1240,6 +1321,10 @@ button:disabled {
   }
 
   .auto-capture-results {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome-guide-grid {
     grid-template-columns: 1fr;
   }
 }
