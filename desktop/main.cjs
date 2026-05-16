@@ -136,16 +136,31 @@ async function findAutoHotkeyPath() {
 }
 
 function buildAhkConfig(profile) {
-  const displayBounds = screen.getPrimaryDisplay().bounds;
+  const displayBounds = screen.getAllDisplays().reduce((bounds, display) => {
+    const right = display.bounds.x + display.bounds.width;
+    const bottom = display.bounds.y + display.bounds.height;
+
+    return {
+      left: Math.min(bounds.left, display.bounds.x),
+      top: Math.min(bounds.top, display.bounds.y),
+      right: Math.max(bounds.right, right),
+      bottom: Math.max(bounds.bottom, bottom)
+    };
+  }, {
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0
+  });
   const lines = [
     [
       "bounds",
-      displayBounds.x,
-      displayBounds.y,
-      displayBounds.x + displayBounds.width,
-      displayBounds.y + displayBounds.height,
+      displayBounds.left,
+      displayBounds.top,
+      displayBounds.right,
+      displayBounds.bottom,
       72,
-      22,
+      40,
       20
     ].join("|")
   ];

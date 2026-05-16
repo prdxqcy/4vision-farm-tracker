@@ -1,6 +1,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
+CoordMode "Pixel", "Screen"
+
 if (A_Args.Length < 2) {
   ExitApp 1
 }
