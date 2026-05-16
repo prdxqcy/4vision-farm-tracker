@@ -1,4 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  NARWASHI_AUTO_CAPTURE_ITEMS,
+  captureDesktopScreenshot,
+  clearNarwashiAutoCaptureProfile,
+  createNarwashiAutoCaptureProfile,
+  loadNarwashiAutoCaptureProfile,
+  scanNarwashiScreen
+} from "./autoCapture";
 import { MAPS, STACK_SIZE } from "./mapConfig";
 import { loadPlayers, loadUiState, savePlayers, saveUiState } from "./storage";
 import {
@@ -192,6 +200,146 @@ function OverlayAccessPanel({ guideMode, installerUrl, isDesktopShell, mapName, 
   );
 }
 
+function AutoCapturePanel({
+  busy,
+  hasProfile,
+  lastResult,
+  message,
+  onAutoCapture,
+  onAutoFill,
+  onClearCalibration,
+  onStartCalibration
+}) {
+  return (
+    <section className="page-panel auto-capture-panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Narwashi Auto Capture</p>
+          <h2>Read tracked items from the game screen</h2>
+          <p className="subtle-text">
+            Calibrate once by clicking a crystal, arcane, and speed potion on a live screenshot. FarmTracks will then
+            scan visible bags anywhere on screen and fill the current inventory totals automatically.
+          </p>
+        </div>
+        <div className="auto-capture-actions">
+          <button type="button" className="secondary-button" onClick={onStartCalibration} disabled={busy}>
+            {hasProfile ? "Recalibrate" : "Calibrate"}
+          </button>
+          <button type="button" className="ghost-button" onClick={onAutoFill} disabled={!hasProfile || busy}>
+            Auto-fill
+          </button>
+          <button type="button" className="primary-button" onClick={onAutoCapture} disabled={!hasProfile || busy}>
+            Auto-capture round
+          </button>
+        </div>
+      </div>
+
+      <div className="auto-capture-meta">
+        <span className={`status-pill ${hasProfile ? "" : "offline"}`}>
+          {hasProfile ? "Calibration ready" : "Calibration needed"}
+        </span>
+        {hasProfile ? (
+          <button type="button" className="ghost-button auto-capture-clear" onClick={onClearCalibration} disabled={busy}>
+            Clear saved calibration
+          </button>
+        ) : null}
+      </div>
+
+      {message ? <p className="helper-text auto-capture-message">{message}</p> : null}
+
+      {lastResult ? (
+        <div className="auto-capture-results">
+          <div className="meta-entry">
+            <span>Last scan</span>
+            <strong>{lastResult.matches.length} matched slots</strong>
+          </div>
+          <div className="meta-entry">
+            <span>Crystals</span>
+            <strong>{lastResult.snapshot.crystals}</strong>
+          </div>
+          <div className="meta-entry">
+            <span>Arcanes</span>
+            <strong>{lastResult.snapshot.arcanes}</strong>
+          </div>
+          <div className="meta-entry">
+            <span>Speed Potions</span>
+            <strong>{lastResult.snapshot["speed-potions"]}</strong>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function AutoCaptureCalibrationModal({ session, onCancel, onRetake, onSelect }) {
+  const nextItem = NARWASHI_AUTO_CAPTURE_ITEMS[session.selections.length];
+
+  function handleImageClick(event) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const scaleX = session.imageWidth / bounds.width;
+    const scaleY = session.imageHeight / bounds.height;
+    const x = Math.round((event.clientX - bounds.left) * scaleX);
+    const y = Math.round((event.clientY - bounds.top) * scaleY);
+    onSelect({ itemId: nextItem.id, x, y });
+  }
+
+  return (
+    <div className="auto-capture-modal-backdrop" role="dialog" aria-modal="true">
+      <div className="auto-capture-modal page-panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Calibration</p>
+            <h2>Click the {nextItem.name} icon</h2>
+            <p className="subtle-text">
+              Open your bags in-game, then click the center of one visible {nextItem.shortName.toLowerCase()} slot in this screenshot.
+            </p>
+          </div>
+          <div className="auto-capture-actions">
+            <button type="button" className="secondary-button" onClick={onRetake}>
+              Retake screenshot
+            </button>
+            <button type="button" className="ghost-button" onClick={onCancel}>
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <div className="auto-capture-selection-list">
+          {NARWASHI_AUTO_CAPTURE_ITEMS.map((item, index) => {
+            const selection = session.selections[index];
+            return (
+              <span key={item.id} className={`status-pill ${selection ? "" : "offline"}`}>
+                {selection ? `${index + 1}. ${item.name} saved` : `${index + 1}. Click ${item.name}`}
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="auto-capture-image-shell">
+          <img
+            src={session.screenshotDataUrl}
+            alt="Game screenshot for auto-capture calibration"
+            className="auto-capture-image"
+            onClick={handleImageClick}
+          />
+          {session.selections.map((selection, index) => (
+            <span
+              key={`${selection.itemId}-${index}`}
+              className="auto-capture-marker"
+              style={{
+                left: `${(selection.x / session.imageWidth) * 100}%`,
+                top: `${(selection.y / session.imageHeight) * 100}%`
+              }}
+            >
+              {index + 1}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CapturePanel({
   formMessage,
   handleCaptureRound,
@@ -347,6 +495,11 @@ function App() {
   const [formMessage, setFormMessage] = useState("");
   const [overlayGuideMode, setOverlayGuideMode] = useState("");
   const [overlayOpacity, setOverlayOpacity] = useState(78);
+  const [autoCaptureProfile, setAutoCaptureProfile] = useState(() => loadNarwashiAutoCaptureProfile());
+  const [autoCaptureBusy, setAutoCaptureBusy] = useState(false);
+  const [autoCaptureMessage, setAutoCaptureMessage] = useState("");
+  const [autoCaptureResult, setAutoCaptureResult] = useState(null);
+  const [calibrationSession, setCalibrationSession] = useState(null);
   const [apiState, setApiState] = useState({
     loading: true,
     error: "",
@@ -477,6 +630,7 @@ function App() {
     : 0;
   const mapSnapshot = splitAmount(activeSnapshotTotal);
   const isDesktopShell = isDesktopShellAvailable();
+  const isNarwashiAutoCaptureAvailable = isDesktopShell && selectedMap.id === "narwashi" && !isOverlayMode;
 
   function handleInventoryChange(itemId, field, nextValue) {
     setInventoryInputs((current) => ({
@@ -487,6 +641,33 @@ function App() {
       }
     }));
     setFormMessage("");
+  }
+
+  function applySnapshot(snapshotTotals, sourceLabel) {
+    if (!selectedPlayer || !selectedSession) {
+      return false;
+    }
+
+    const nextRoundGains = getRoundGains(selectedSession.currentSnapshot ?? {}, snapshotTotals);
+
+    if (hasNegativeGain(nextRoundGains)) {
+      setFormMessage(`Auto-capture found lower counts than the current saved bag state. Review the scan before recording ${sourceLabel}.`);
+      return false;
+    }
+
+    if (!hasPositiveGain(nextRoundGains)) {
+      setFormMessage(`No new gains were found for ${sourceLabel}.`);
+      return false;
+    }
+
+    setPlayers((currentPlayers) =>
+      currentPlayers.map((player) =>
+        player.id === selectedPlayer.id ? applyRound(player, selectedMap.id, snapshotTotals) : player
+      )
+    );
+    setInventoryInputs(buildInventoryInputs(selectedMap, snapshotTotals));
+    setFormMessage(`Round ${nextRoundNumber} captured from ${sourceLabel}.`);
+    return true;
   }
 
   function handleOpenOverlay() {
@@ -557,27 +738,7 @@ function App() {
 
   function handleCaptureRound(event) {
     event.preventDefault();
-
-    if (!selectedPlayer || !selectedSession) {
-      return;
-    }
-
-    if (hasNegativeGain(roundGains)) {
-      setFormMessage("One or more counts moved backward. Finish this session before banking or dropping items.");
-      return;
-    }
-
-    if (!hasPositiveGain(roundGains)) {
-      setFormMessage("Update at least one inventory count before capturing the round.");
-      return;
-    }
-
-    setPlayers((currentPlayers) =>
-      currentPlayers.map((player) =>
-        player.id === selectedPlayer.id ? applyRound(player, selectedMap.id, roundSnapshot) : player
-      )
-    );
-    setFormMessage(`Round ${nextRoundNumber} captured from the latest inventory checkpoint.`);
+    applySnapshot(roundSnapshot, "the latest inventory checkpoint");
   }
 
   function handleFinishSession() {
@@ -606,6 +767,98 @@ function App() {
       )
     );
     setFormMessage(`Current session reset for ${selectedPlayer.name}.`);
+  }
+
+  async function handleStartAutoCaptureCalibration() {
+    setAutoCaptureBusy(true);
+    setAutoCaptureMessage("");
+
+    try {
+      const screenshotDataUrl = await captureDesktopScreenshot();
+      const screenshotImage = new Image();
+      screenshotImage.src = screenshotDataUrl;
+      await screenshotImage.decode();
+
+      setCalibrationSession({
+        screenshotDataUrl,
+        imageWidth: screenshotImage.width,
+        imageHeight: screenshotImage.height,
+        selections: []
+      });
+    } catch (error) {
+      setAutoCaptureMessage(error instanceof Error ? error.message : "Unable to capture the screen for calibration.");
+    } finally {
+      setAutoCaptureBusy(false);
+    }
+  }
+
+  async function handleRetakeAutoCaptureCalibration() {
+    await handleStartAutoCaptureCalibration();
+  }
+
+  async function handleSelectCalibrationPoint(selection) {
+    if (!calibrationSession) {
+      return;
+    }
+
+    const nextSelections = [...calibrationSession.selections, selection];
+
+    if (nextSelections.length < NARWASHI_AUTO_CAPTURE_ITEMS.length) {
+      setCalibrationSession({
+        ...calibrationSession,
+        selections: nextSelections
+      });
+      return;
+    }
+
+    setAutoCaptureBusy(true);
+
+    try {
+      const nextProfile = await createNarwashiAutoCaptureProfile({
+        screenshotDataUrl: calibrationSession.screenshotDataUrl,
+        selections: nextSelections
+      });
+
+      setAutoCaptureProfile(nextProfile);
+      setCalibrationSession(null);
+      setAutoCaptureResult(null);
+      setAutoCaptureMessage("Calibration saved. You can now auto-fill or auto-capture Narwashi rounds.");
+    } catch (error) {
+      setAutoCaptureMessage(error instanceof Error ? error.message : "Unable to save auto-capture calibration.");
+    } finally {
+      setAutoCaptureBusy(false);
+    }
+  }
+
+  function handleClearAutoCaptureCalibration() {
+    clearNarwashiAutoCaptureProfile();
+    setAutoCaptureProfile(null);
+    setAutoCaptureResult(null);
+    setAutoCaptureMessage("Saved Narwashi calibration cleared.");
+  }
+
+  async function runNarwashiAutoCapture(autoSubmit) {
+    setAutoCaptureBusy(true);
+    setAutoCaptureMessage("");
+
+    try {
+      const result = await scanNarwashiScreen(autoCaptureProfile);
+      const summary = `Detected ${result.snapshot.crystals} crystals, ${result.snapshot.arcanes} arcanes, and ${result.snapshot["speed-potions"]} speed potions from ${result.matches.length} matched slots.`;
+
+      setAutoCaptureResult(result);
+      setInventoryInputs(buildInventoryInputs(selectedMap, result.snapshot));
+
+      if (autoSubmit) {
+        const captured = applySnapshot(result.snapshot, "auto-capture");
+        setAutoCaptureMessage(captured ? `${summary} Round recorded automatically.` : `${summary} Review the filled values before capturing.`);
+      } else {
+        setAutoCaptureMessage(`${summary} Review the filled values or press Auto-capture round.`);
+      }
+    } catch (error) {
+      setAutoCaptureMessage(error instanceof Error ? error.message : "Auto-capture failed.");
+    } finally {
+      setAutoCaptureBusy(false);
+    }
   }
 
   if (isOverlayMode) {
@@ -831,6 +1084,19 @@ function App() {
                 onLaunch={handleLaunchOverlayApp}
               />
 
+              {isNarwashiAutoCaptureAvailable ? (
+                <AutoCapturePanel
+                  busy={autoCaptureBusy}
+                  hasProfile={Boolean(autoCaptureProfile)}
+                  lastResult={autoCaptureResult}
+                  message={autoCaptureMessage}
+                  onAutoCapture={() => runNarwashiAutoCapture(true)}
+                  onAutoFill={() => runNarwashiAutoCapture(false)}
+                  onClearCalibration={handleClearAutoCaptureCalibration}
+                  onStartCalibration={handleStartAutoCaptureCalibration}
+                />
+              ) : null}
+
               <section className="content-grid">
                 <CapturePanel
                   formMessage={formMessage}
@@ -970,6 +1236,14 @@ function App() {
           )}
         </main>
       </div>
+      {calibrationSession ? (
+        <AutoCaptureCalibrationModal
+          session={calibrationSession}
+          onCancel={() => setCalibrationSession(null)}
+          onRetake={handleRetakeAutoCaptureCalibration}
+          onSelect={handleSelectCalibrationPoint}
+        />
+      ) : null}
     </div>
   );
 }

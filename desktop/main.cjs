@@ -1,5 +1,6 @@
 const path = require("path");
 const { app, BrowserWindow, ipcMain, screen } = require("electron");
+const screenshot = require("screenshot-desktop");
 
 const OVERLAY_QUERY = "capture-overlay";
 const DEV_SERVER_URL = "http://127.0.0.1:5173";
@@ -183,6 +184,11 @@ ipcMain.handle("farmtracks:set-overlay-opacity", (_event, opacity) => {
   const safeOpacity = Math.min(1, Math.max(0.35, Number(opacity) || DEFAULT_OVERLAY_OPACITY));
   overlayWindow.setOpacity(safeOpacity);
   return safeOpacity;
+});
+
+ipcMain.handle("farmtracks:capture-screen", async () => {
+  const image = await screenshot({ format: "png" });
+  return `data:image/png;base64,${image.toString("base64")}`;
 });
 
 ipcMain.handle("farmtracks:close-window", (event) => {

@@ -28,7 +28,9 @@
   },
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^4.22.2"
+    "express": "^4.22.2",
+    "screenshot-desktop": "^1.15.4",
+    "tesseract.js": "^7.0.0"
   },
   "build": {
     "appId": "com.vision4.farmtracks",

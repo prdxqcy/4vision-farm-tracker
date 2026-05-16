@@ -616,6 +616,91 @@ input:focus {
   color: #b7d5ff;
 }
 
+.auto-capture-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auto-capture-actions,
+.auto-capture-meta,
+.auto-capture-selection-list {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.auto-capture-clear {
+  margin-left: auto;
+}
+
+.auto-capture-message {
+  margin-top: -4px;
+}
+
+.auto-capture-results {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.auto-capture-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 10, 0.82);
+  backdrop-filter: blur(10px);
+}
+
+.auto-capture-modal {
+  width: min(1120px, 100%);
+  max-height: calc(100vh - 48px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: auto;
+}
+
+.auto-capture-image-shell {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(236, 209, 154, 0.22);
+  background: rgba(10, 12, 17, 0.88);
+}
+
+.auto-capture-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: crosshair;
+}
+
+.auto-capture-marker {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin-left: -13px;
+  margin-top: -13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(180deg, #468ff7, #2a68d3);
+  color: #fff;
+  font-family: "Marcellus", serif;
+  font-size: 0.92rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
 .stack-column {
   display: flex;
   flex-direction: column;
@@ -1069,6 +1154,10 @@ button:disabled {
   .records-grid {
     grid-template-columns: 1fr;
   }
+
+  .auto-capture-results {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -1085,7 +1174,9 @@ button:disabled {
   .session-hero,
   .capture-footer,
   .capture-panel-actions,
-  .overlay-launch-actions {
+  .overlay-launch-actions,
+  .auto-capture-actions,
+  .auto-capture-meta {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1110,6 +1201,10 @@ button:disabled {
 
   .session-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .auto-capture-results {
+    grid-template-columns: 1fr;
   }
 }
 
