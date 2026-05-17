@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs/promises");
+const fsSync = require("fs");
 const os = require("os");
 const { execFile, spawn } = require("child_process");
 const readline = require("readline");
@@ -23,6 +24,10 @@ let pythonWorker = null;
 let pythonWorkerRunning = false;
 let pythonWorkerRestartTimer = null;
 const PYTHON_RESTART_DELAY_MS = 3000;
+
+const HOTKEYS_CONFIG_FILE = "hotkeys.json"; // resolved after app is ready
+const DEFAULT_HOTKEYS = { toggleOverlay: "F7", resetPending: "F8", endRound: "F9" };
+let currentHotkeys = { ...DEFAULT_HOTKEYS };
 
 const singleInstanceLock = app.requestSingleInstanceLock();
 
@@ -450,6 +455,62 @@ function schedulePythonWorkerRestart() {
   }, PYTHON_RESTART_DELAY_MS);
 }
 
+function getHotkeysConfigPath() {
+  return path.join(app.getPath("userData"), HOTKEYS_CONFIG_FILE);
+}
+
+function loadHotkeysConfig() {
+  try {
+    const raw = fsSync.readFileSync(getHotkeysConfigPath(), "utf8");
+    return { ...DEFAULT_HOTKEYS, ...JSON.parse(raw) };
+  } catch (_) {
+    return { ...DEFAULT_HOTKEYS };
+  }
+}
+
+function saveHotkeysConfig(hotkeys) {
+  try {
+    fsSync.writeFileSync(getHotkeysConfigPath(), JSON.stringify(hotkeys, null, 2), "utf8");
+  } catch (_) {}
+}
+
+function registerHotkeys(hotkeys) {
+  globalShortcut.unregisterAll();
+
+  if (hotkeys.toggleOverlay) {
+    try {
+      globalShortcut.register(hotkeys.toggleOverlay, () => {
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          if (overlayWindow.isVisible()) {
+            overlayWindow.hide();
+          } else {
+            overlayWindow.show();
+            overlayWindow.focus();
+          }
+        }
+      });
+    } catch (_) {}
+  }
+
+  if (hotkeys.resetPending) {
+    try {
+      globalShortcut.register(hotkeys.resetPending, () => {
+        broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "reset-pending" });
+      });
+    } catch (_) {}
+  }
+
+  if (hotkeys.endRound) {
+    try {
+      globalShortcut.register(hotkeys.endRound, () => {
+        broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "end-round" });
+      });
+    } catch (_) {}
+  }
+
+  currentHotkeys = hotkeys;
+}
+
 function registerProtocolClient() {
   if (process.defaultApp && process.argv.length >= 2) {
     app.setAsDefaultProtocolClient(CUSTOM_PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
@@ -621,6 +682,16 @@ ipcMain.handle("farmtracks:scanner-end-round", () => {
   return { ok: true };
 });
 
+ipcMain.handle("farmtracks:get-hotkeys", () => currentHotkeys);
+
+ipcMain.handle("farmtracks:set-hotkeys", (_event, hotkeys) => {
+  const next = { ...DEFAULT_HOTKEYS, ...hotkeys };
+  saveHotkeysConfig(next);
+  registerHotkeys(next);
+  broadcastToAllWindows("farmtracks:hotkeys-updated", next);
+  return next;
+});
+
 function focusMainWindow() {
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isMinimized()) {
     mainWindow.restore();
@@ -688,27 +759,9 @@ app.whenReady().then(async () => {
     }
   });
 
-  // F7 = toggle overlay visibility
-  globalShortcut.register("F7", () => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      if (overlayWindow.isVisible()) {
-        overlayWindow.hide();
-      } else {
-        overlayWindow.show();
-        overlayWindow.focus();
-      }
-    }
-  });
-
-  // F8 = reset pending round baseline
-  globalShortcut.register("F8", () => {
-    broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "reset-pending" });
-  });
-
-  // F9 = end / save current round
-  globalShortcut.register("F9", () => {
-    broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "end-round" });
-  });
+  // Load and register hotkeys (user-configurable, stored in userData/hotkeys.json)
+  currentHotkeys = loadHotkeysConfig();
+  registerHotkeys(currentHotkeys);
 
   // Auto-start the Python scanner
   startPythonWorker();

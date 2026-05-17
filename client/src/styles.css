@@ -1657,10 +1657,168 @@ button:disabled {
 
 .overlay-session-meta {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   color: var(--gold-faint);
   border-top: 1px solid var(--border-soft);
   padding-top: 8px;
   margin-top: auto;
+}
+
+.overlay-session-meta span {
+  flex: 1;
+}
+
+.overlay-toggle-manual {
+  background: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  color: var(--gold-faint);
+  font-size: 10px;
+  padding: 2px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.overlay-toggle-manual:hover {
+  color: var(--gold);
+  border-color: var(--border);
+}
+
+/* Manual input form inside overlay */
+
+.overlay-manual-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.overlay-manual-row {
+  display: grid;
+  grid-template-columns: 1fr 56px 56px;
+  align-items: center;
+  gap: 6px;
+}
+
+.overlay-manual-name {
+  font-size: 11px;
+  color: var(--gold-faint);
+}
+
+.overlay-manual-input {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  color: var(--gold);
+  font-size: 12px;
+  padding: 4px 6px;
+  text-align: center;
+}
+
+.overlay-manual-input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.overlay-manual-input::placeholder {
+  color: var(--gold-faint);
+  font-size: 10px;
+}
+
+/* Hotkey settings modal */
+
+.overlay-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 11, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.overlay-settings-modal {
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.overlay-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.overlay-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+}
+
+.overlay-hotkey-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.overlay-hotkey-row:last-child {
+  border-bottom: none;
+}
+
+.overlay-hotkey-label {
+  font-size: 12px;
+  color: var(--gold-faint);
+}
+
+.overlay-hotkey-bind {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  cursor: pointer;
+  min-width: 60px;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.overlay-hotkey-bind:hover {
+  border-color: var(--gold);
+}
+
+.overlay-hotkey-bind.listening {
+  border-color: var(--blue);
+  color: var(--blue);
+  animation: pulse-border 0.8s ease infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.overlay-settings-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-soft);
 }

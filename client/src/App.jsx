@@ -718,6 +718,58 @@ function ScannerStatusPanel({
   );
 }
 
+function HotkeySettingsModal({ hotkeys, onSave, onClose }) {
+  const [editing, setEditing] = useState({ ...hotkeys });
+  const [binding, setBinding] = useState(null); // which key is being rebound
+
+  function startBinding(field) {
+    setBinding(field);
+  }
+
+  useEffect(() => {
+    if (!binding) return;
+    function onKeyDown(e) {
+      e.preventDefault();
+      const key = e.key === " " ? "Space" : e.key;
+      setEditing((prev) => ({ ...prev, [binding]: key }));
+      setBinding(null);
+    }
+    window.addEventListener("keydown", onKeyDown, { once: true });
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [binding]);
+
+  const LABELS = { toggleOverlay: "Toggle overlay", resetPending: "Reset baseline", endRound: "End round" };
+
+  return (
+    <div className="overlay-settings-backdrop" onClick={onClose}>
+      <div className="overlay-settings-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="overlay-settings-header">
+          <strong>Hotkey Settings</strong>
+          <button type="button" className="overlay-icon-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="overlay-settings-body">
+          {Object.entries(LABELS).map(([field, label]) => (
+            <div key={field} className="overlay-hotkey-row">
+              <span className="overlay-hotkey-label">{label}</span>
+              <button
+                type="button"
+                className={`overlay-hotkey-bind ${binding === field ? "listening" : ""}`}
+                onClick={() => startBinding(field)}
+              >
+                {binding === field ? "Press a key…" : (editing[field] || "—")}
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="overlay-settings-footer">
+          <button type="button" className="overlay-action-btn secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="overlay-action-btn primary" onClick={() => onSave(editing)}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OverlayScannerPanel({
   isRunning,
   latestSnapshot,
@@ -732,80 +784,146 @@ function OverlayScannerPanel({
   selectedSession,
   nextRoundNumber,
   formMessage,
+  inventoryInputs,
+  onInventoryChange,
+  onCaptureRound,
+  roundGains,
+  hotkeys,
+  onSaveHotkeys,
 }) {
+  const [showManual, setShowManual] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const lastScanLabel = lastScanAt ? new Date(lastScanAt).toLocaleTimeString() : "—";
   const sessionTotal = getTotalItems(selectedSession?.totals ?? {});
+  const canCaptureManual = hasPositiveGain(roundGains);
+
+  const hk = hotkeys || { toggleOverlay: "F7", resetPending: "F8", endRound: "F9" };
 
   return (
-    <div className="overlay-scanner-panel">
-      <div className="overlay-scanner-status">
-        <span className={`status-pill ${isRunning ? "" : "offline"}`}>
-          {isRunning ? "Scanning" : "Stopped"}
-        </span>
-        <span className="overlay-scan-time">{lastScanLabel}</span>
-        {isRunning ? (
-          <button type="button" className="ghost-button overlay-scanner-toggle" onClick={onStop}>Stop</button>
-        ) : (
-          <button type="button" className="ghost-button overlay-scanner-toggle" onClick={onStart}>Start</button>
-        )}
+    <>
+      <div className="overlay-scanner-panel">
+        <div className="overlay-scanner-status">
+          <span className={`status-pill ${isRunning ? "" : "offline"}`}>
+            {isRunning ? "Scanning" : "Stopped"}
+          </span>
+          <span className="overlay-scan-time">{lastScanLabel}</span>
+          {isRunning ? (
+            <button type="button" className="ghost-button overlay-scanner-toggle" onClick={onStop}>Stop</button>
+          ) : (
+            <button type="button" className="ghost-button overlay-scanner-toggle" onClick={onStart}>Start</button>
+          )}
+          <button type="button" className="overlay-icon-btn" onClick={() => setShowSettings(true)} title="Hotkey settings">⚙</button>
+        </div>
+
+        {scannerError ? (
+          <p className="feedback-text overlay-scanner-error">{scannerError}</p>
+        ) : null}
+
+        <div className="overlay-item-grid">
+          {latestSnapshot ? (
+            <>
+              <div className="overlay-item-row">
+                <span className="overlay-item-name">Crystals</span>
+                <span className="overlay-item-count">{latestSnapshot.crystals ?? 0}</span>
+                <span className="overlay-item-gain">+{Math.max(0, pendingGains?.crystals ?? 0)}</span>
+              </div>
+              <div className="overlay-item-row">
+                <span className="overlay-item-name">Arcanes</span>
+                <span className="overlay-item-count">{latestSnapshot.arcanes ?? 0}</span>
+                <span className="overlay-item-gain">+{Math.max(0, pendingGains?.arcanes ?? 0)}</span>
+              </div>
+              <div className="overlay-item-row">
+                <span className="overlay-item-name">Potions</span>
+                <span className="overlay-item-count">{latestSnapshot["speed-potions"] ?? 0}</span>
+                <span className="overlay-item-gain">+{Math.max(0, pendingGains?.["speed-potions"] ?? 0)}</span>
+              </div>
+            </>
+          ) : (
+            <p className="overlay-scanner-waiting">Waiting for first scan…</p>
+          )}
+        </div>
+
+        <div className="overlay-scanner-actions">
+          <button
+            type="button"
+            className="overlay-action-btn secondary"
+            onClick={onResetPending}
+            disabled={!isRunning}
+            title={`Reset pending baseline (${hk.resetPending})`}
+          >
+            Reset <kbd>{hk.resetPending}</kbd>
+          </button>
+          <button
+            type="button"
+            className="overlay-action-btn primary"
+            onClick={onEndRound}
+            disabled={!latestSnapshot}
+            title={`Save round (${hk.endRound})`}
+          >
+            End Round <kbd>{hk.endRound}</kbd>
+          </button>
+        </div>
+
+        {formMessage ? <p className="overlay-form-message">{formMessage}</p> : null}
+
+        <div className="overlay-session-meta">
+          <span>Round {nextRoundNumber}</span>
+          <span>{sessionTotal} items this session</span>
+          <button
+            type="button"
+            className="overlay-toggle-manual"
+            onClick={() => setShowManual((v) => !v)}
+          >
+            {showManual ? "Hide manual" : "Manual input"}
+          </button>
+        </div>
+
+        {showManual ? (
+          <form className="overlay-manual-form" onSubmit={(e) => { e.preventDefault(); onCaptureRound(); }}>
+            {selectedMap.items.map((item) => (
+              <div key={item.id} className="overlay-manual-row">
+                <span className="overlay-manual-name">{item.name}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="Stacks"
+                  value={inventoryInputs[item.id]?.stacks ?? ""}
+                  onChange={(e) => onInventoryChange(item.id, "stacks", e.target.value)}
+                  className="overlay-manual-input"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max={STACK_SIZE - 1}
+                  step="1"
+                  placeholder="Loose"
+                  value={inventoryInputs[item.id]?.loose ?? ""}
+                  onChange={(e) => onInventoryChange(item.id, "loose", e.target.value)}
+                  className="overlay-manual-input"
+                />
+              </div>
+            ))}
+            <button
+              type="submit"
+              className="overlay-action-btn primary"
+              style={{ width: "100%", marginTop: 6 }}
+              disabled={!canCaptureManual}
+            >
+              Capture round manually
+            </button>
+          </form>
+        ) : null}
       </div>
 
-      {scannerError ? (
-        <p className="feedback-text overlay-scanner-error">{scannerError}</p>
+      {showSettings ? (
+        <HotkeySettingsModal
+          hotkeys={hk}
+          onSave={(next) => { onSaveHotkeys(next); setShowSettings(false); }}
+          onClose={() => setShowSettings(false)}
+        />
       ) : null}
-
-      <div className="overlay-item-grid">
-        {latestSnapshot ? (
-          <>
-            <div className="overlay-item-row">
-              <span className="overlay-item-name">Crystals</span>
-              <span className="overlay-item-count">{latestSnapshot.crystals ?? 0}</span>
-              <span className="overlay-item-gain">+{Math.max(0, pendingGains?.crystals ?? 0)}</span>
-            </div>
-            <div className="overlay-item-row">
-              <span className="overlay-item-name">Arcanes</span>
-              <span className="overlay-item-count">{latestSnapshot.arcanes ?? 0}</span>
-              <span className="overlay-item-gain">+{Math.max(0, pendingGains?.arcanes ?? 0)}</span>
-            </div>
-            <div className="overlay-item-row">
-              <span className="overlay-item-name">Potions</span>
-              <span className="overlay-item-count">{latestSnapshot["speed-potions"] ?? 0}</span>
-              <span className="overlay-item-gain">+{Math.max(0, pendingGains?.["speed-potions"] ?? 0)}</span>
-            </div>
-          </>
-        ) : (
-          <p className="overlay-scanner-waiting">Waiting for first scan…</p>
-        )}
-      </div>
-
-      <div className="overlay-scanner-actions">
-        <button
-          type="button"
-          className="overlay-action-btn secondary"
-          onClick={onResetPending}
-          disabled={!isRunning}
-          title="Reset pending baseline (F8)"
-        >
-          Reset <kbd>F8</kbd>
-        </button>
-        <button
-          type="button"
-          className="overlay-action-btn primary"
-          onClick={onEndRound}
-          disabled={!latestSnapshot}
-          title="Save round (F9)"
-        >
-          End Round <kbd>F9</kbd>
-        </button>
-      </div>
-
-      {formMessage ? <p className="overlay-form-message">{formMessage}</p> : null}
-
-      <div className="overlay-session-meta">
-        <span>Round {nextRoundNumber}</span>
-        <span>{sessionTotal} items this session</span>
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -886,6 +1004,10 @@ function App() {
   // Refs so hotkey handlers always see the latest values despite the [] closure
   const scannerLatestSnapshotRef = useRef(null);
   const handleEndScannerRoundRef = useRef(null);
+  const handleResetPendingRoundRef = useRef(null);
+
+  // Hotkeys config (loaded from Electron on mount)
+  const [hotkeys, setHotkeys] = useState({ toggleOverlay: "F7", resetPending: "F8", endRound: "F9" });
 
   const selectedMap = useMemo(
     () => MAPS.find((map) => map.id === selectedMapId) ?? MAPS[0],
@@ -1027,17 +1149,26 @@ function App() {
 
     const unsubHotkey = window.farmtracksDesktop.onScannerHotkey((payload) => {
       if (payload.action === "reset-pending") {
-        // Use functional updater so we read latest snapshot via ref, not stale closure
-        setScannerPendingBaseline(scannerLatestSnapshotRef.current);
+        handleResetPendingRoundRef.current?.();
       }
       if (payload.action === "end-round") {
         handleEndScannerRoundRef.current?.();
       }
     });
 
+    // Load saved hotkeys and subscribe to changes
+    window.farmtracksDesktop.getHotkeys().then((hk) => {
+      if (hk) setHotkeys(hk);
+    }).catch(() => {});
+
+    const unsubHotkeys = window.farmtracksDesktop.onHotkeysUpdated((hk) => {
+      setHotkeys(hk);
+    });
+
     return () => {
       unsubUpdate();
       unsubHotkey();
+      unsubHotkeys();
     };
   }, []);
 
@@ -1312,7 +1443,7 @@ function App() {
   }
 
   function handleResetPendingRound() {
-    setScannerPendingBaseline(scannerLatestSnapshot);
+    setScannerPendingBaseline(scannerLatestSnapshotRef.current);
   }
 
   function handleEndScannerRound() {
@@ -1331,8 +1462,17 @@ function App() {
     }
   }
 
-  // Keep ref current on every render so the hotkey closure always calls the latest version
+  // Keep refs current on every render so hotkey closures always call the latest version
   handleEndScannerRoundRef.current = handleEndScannerRound;
+  handleResetPendingRoundRef.current = handleResetPendingRound;
+
+  function handleSaveHotkeys(next) {
+    if (isDesktopShell) {
+      window.farmtracksDesktop.setHotkeys(next);
+    } else {
+      setHotkeys(next);
+    }
+  }
 
   if (isOverlayMode) {
     return (
@@ -1390,6 +1530,12 @@ function App() {
             selectedSession={selectedSession}
             nextRoundNumber={nextRoundNumber}
             formMessage={formMessage}
+            inventoryInputs={inventoryInputs}
+            onInventoryChange={handleInventoryChange}
+            onCaptureRound={() => applySnapshot(normalizeRoundInput(selectedMap, inventoryInputs), "manual input")}
+            roundGains={roundGains}
+            hotkeys={hotkeys}
+            onSaveHotkeys={handleSaveHotkeys}
           />
         ) : (
           <p className="overlay-scanner-waiting">Preparing session…</p>

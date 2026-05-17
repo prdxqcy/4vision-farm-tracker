@@ -27,4 +27,13 @@ contextBridge.exposeInMainWorld("farmtracksDesktop", {
     ipcRenderer.on("farmtracks:scanner-hotkey", handler);
     return () => ipcRenderer.removeListener("farmtracks:scanner-hotkey", handler);
   },
+
+  // Hotkey configuration
+  getHotkeys: () => ipcRenderer.invoke("farmtracks:get-hotkeys"),
+  setHotkeys: (hotkeys) => ipcRenderer.invoke("farmtracks:set-hotkeys", hotkeys),
+  onHotkeysUpdated: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("farmtracks:hotkeys-updated", handler);
+    return () => ipcRenderer.removeListener("farmtracks:hotkeys-updated", handler);
+  },
 });
