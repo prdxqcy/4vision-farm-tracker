@@ -497,10 +497,10 @@ function createOverlayWindow(options = {}) {
   const { x, y, width } = display.workArea;
 
   overlayWindow = new BrowserWindow({
-    width: 560,
-    height: 860,
-    minWidth: 420,
-    minHeight: 620,
+    width: 340,
+    height: 420,
+    minWidth: 300,
+    minHeight: 360,
     x: Math.max(x + 24, x + width - 584),
     y: y + 24,
     frame: false,

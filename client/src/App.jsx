@@ -676,10 +676,8 @@ function ScannerStatusPanel({
   onStop,
   onResetPending,
   onEndRound,
-  selectedMap
 }) {
-  const hasGains = pendingGains && Object.values(pendingGains).some((v) => v > 0);
-  const lastScanLabel = lastScanAt ? new Date(lastScanAt).toLocaleTimeString() : "Never";
+  const lastScanLabel = lastScanAt ? new Date(lastScanAt).toLocaleTimeString() : "—";
 
   return (
     <section className="page-panel auto-capture-panel">
@@ -688,50 +686,126 @@ function ScannerStatusPanel({
           <p className="eyebrow">Python Scanner</p>
           <h2>Background inventory scanner</h2>
           <p className="subtle-text">
-            Scans the game screen every 2–3 seconds. Press F8 to reset pending baseline, F9 to save round. F7 hides/shows overlay.
+            Scans every 2–3 s. F7 toggle overlay · F8 reset baseline · F9 save round.
           </p>
         </div>
         <div className="auto-capture-actions">
           {isRunning ? (
-            <button type="button" className="ghost-button" onClick={onStop}>Stop scanner</button>
+            <button type="button" className="ghost-button" onClick={onStop}>Stop</button>
           ) : (
-            <button type="button" className="secondary-button" onClick={onStart}>Start scanner</button>
+            <button type="button" className="secondary-button" onClick={onStart}>Start</button>
           )}
-          <button type="button" className="ghost-button" onClick={onResetPending} disabled={!isRunning}>
-            Reset baseline (F8)
-          </button>
-          <button type="button" className="primary-button" onClick={onEndRound} disabled={!latestSnapshot}>
-            End round (F9)
-          </button>
+          <button type="button" className="ghost-button" onClick={onResetPending} disabled={!isRunning}>Reset (F8)</button>
+          <button type="button" className="primary-button" onClick={onEndRound} disabled={!latestSnapshot}>End round (F9)</button>
         </div>
       </div>
 
       <div className="auto-capture-meta">
-        <span className={`status-pill ${isRunning ? "" : "offline"}`}>
-          {isRunning ? "Scanner active" : "Scanner stopped"}
-        </span>
+        <span className={`status-pill ${isRunning ? "" : "offline"}`}>{isRunning ? "Active" : "Stopped"}</span>
         <span className="helper-text">Last scan: {lastScanLabel}</span>
       </div>
 
-      {scannerError ? (
-        <p className="feedback-text">{scannerError}</p>
-      ) : null}
+      {scannerError ? <p className="feedback-text">{scannerError}</p> : null}
 
       {latestSnapshot ? (
         <div className="auto-capture-results">
-          <div className="meta-entry"><span>Crystals</span><strong>{latestSnapshot.crystals ?? 0}</strong></div>
-          <div className="meta-entry"><span>Arcanes</span><strong>{latestSnapshot.arcanes ?? 0}</strong></div>
-          <div className="meta-entry"><span>Speed Potions</span><strong>{latestSnapshot["speed-potions"] ?? 0}</strong></div>
-          {pendingGains ? (
-            <>
-              <div className="meta-entry"><span>Pending crystals</span><strong>+{Math.max(0, pendingGains.crystals ?? 0)}</strong></div>
-              <div className="meta-entry"><span>Pending arcanes</span><strong>+{Math.max(0, pendingGains.arcanes ?? 0)}</strong></div>
-              <div className="meta-entry"><span>Pending potions</span><strong>+{Math.max(0, pendingGains["speed-potions"] ?? 0)}</strong></div>
-            </>
-          ) : null}
+          <div className="meta-entry"><span>Crystals</span><strong>{latestSnapshot.crystals ?? 0}{pendingGains ? ` (+${Math.max(0, pendingGains.crystals ?? 0)})` : ""}</strong></div>
+          <div className="meta-entry"><span>Arcanes</span><strong>{latestSnapshot.arcanes ?? 0}{pendingGains ? ` (+${Math.max(0, pendingGains.arcanes ?? 0)})` : ""}</strong></div>
+          <div className="meta-entry"><span>Potions</span><strong>{latestSnapshot["speed-potions"] ?? 0}{pendingGains ? ` (+${Math.max(0, pendingGains["speed-potions"] ?? 0)})` : ""}</strong></div>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function OverlayScannerPanel({
+  isRunning,
+  latestSnapshot,
+  pendingGains,
+  lastScanAt,
+  scannerError,
+  onStart,
+  onStop,
+  onResetPending,
+  onEndRound,
+  selectedMap,
+  selectedSession,
+  nextRoundNumber,
+  formMessage,
+}) {
+  const lastScanLabel = lastScanAt ? new Date(lastScanAt).toLocaleTimeString() : "—";
+  const sessionTotal = getTotalItems(selectedSession?.totals ?? {});
+
+  return (
+    <div className="overlay-scanner-panel">
+      <div className="overlay-scanner-status">
+        <span className={`status-pill ${isRunning ? "" : "offline"}`}>
+          {isRunning ? "Scanning" : "Stopped"}
+        </span>
+        <span className="overlay-scan-time">{lastScanLabel}</span>
+        {isRunning ? (
+          <button type="button" className="ghost-button overlay-scanner-toggle" onClick={onStop}>Stop</button>
+        ) : (
+          <button type="button" className="ghost-button overlay-scanner-toggle" onClick={onStart}>Start</button>
+        )}
+      </div>
+
+      {scannerError ? (
+        <p className="feedback-text overlay-scanner-error">{scannerError}</p>
+      ) : null}
+
+      <div className="overlay-item-grid">
+        {latestSnapshot ? (
+          <>
+            <div className="overlay-item-row">
+              <span className="overlay-item-name">Crystals</span>
+              <span className="overlay-item-count">{latestSnapshot.crystals ?? 0}</span>
+              <span className="overlay-item-gain">+{Math.max(0, pendingGains?.crystals ?? 0)}</span>
+            </div>
+            <div className="overlay-item-row">
+              <span className="overlay-item-name">Arcanes</span>
+              <span className="overlay-item-count">{latestSnapshot.arcanes ?? 0}</span>
+              <span className="overlay-item-gain">+{Math.max(0, pendingGains?.arcanes ?? 0)}</span>
+            </div>
+            <div className="overlay-item-row">
+              <span className="overlay-item-name">Potions</span>
+              <span className="overlay-item-count">{latestSnapshot["speed-potions"] ?? 0}</span>
+              <span className="overlay-item-gain">+{Math.max(0, pendingGains?.["speed-potions"] ?? 0)}</span>
+            </div>
+          </>
+        ) : (
+          <p className="overlay-scanner-waiting">Waiting for first scan…</p>
+        )}
+      </div>
+
+      <div className="overlay-scanner-actions">
+        <button
+          type="button"
+          className="overlay-action-btn secondary"
+          onClick={onResetPending}
+          disabled={!isRunning}
+          title="Reset pending baseline (F8)"
+        >
+          Reset <kbd>F8</kbd>
+        </button>
+        <button
+          type="button"
+          className="overlay-action-btn primary"
+          onClick={onEndRound}
+          disabled={!latestSnapshot}
+          title="Save round (F9)"
+        >
+          End Round <kbd>F9</kbd>
+        </button>
+      </div>
+
+      {formMessage ? <p className="overlay-form-message">{formMessage}</p> : null}
+
+      <div className="overlay-session-meta">
+        <span>Round {nextRoundNumber}</span>
+        <span>{sessionTotal} items this session</span>
+      </div>
+    </div>
   );
 }
 
@@ -1262,113 +1336,65 @@ function App() {
 
   if (isOverlayMode) {
     return (
-      <>
-        <main className="overlay-shell">
-          <section className="overlay-header page-panel">
-            <div className="overlay-drag-surface">
-              <p className="eyebrow">FarmTracks Overlay</p>
-              <h1>{selectedMap.name} Capture</h1>
-              <div className="overlay-drag-handle" aria-hidden="true">
-                <span className="overlay-drag-grip" />
-                <span className="overlay-drag-label">Drag to move overlay</span>
-              </div>
-            </div>
-            <OverlayWindowControls
-              onClose={handleCloseOverlay}
-              onOpenDashboard={handleOpenMainWindow}
-              onOpacityChange={handleOverlayOpacityChange}
-              opacityValue={overlayOpacity}
-              showDashboardButton={isDesktopShell}
-            />
-          </section>
-
-          {selectedPlayer ? (
-            <>
-              <section className="overlay-map-switcher page-panel">
-                <div className="panel-header">
-                  <div>
-                    <h2>Route</h2>
-                    <p className="subtle-text">Switch the active farming route without touching the main window.</p>
-                  </div>
-                </div>
-                <div className="sidebar-map-list overlay-map-list" role="tablist" aria-label="Map selector">
-                  {MAPS.map((map) => (
-                    <button
-                      key={map.id}
-                      type="button"
-                      className={`sidebar-map-item ${map.id === selectedMapId ? "active" : ""}`}
-                      onClick={() => setSelectedMapId(map.id)}
-                    >
-                      <strong>{map.name}</strong>
-                      <span>{map.subtitle}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              {isNarwashiAutoCaptureAvailable ? (
-                <AutoCapturePanel
-                  busy={autoCaptureBusy}
-                  hasProfile={Boolean(autoCaptureProfile)}
-                  lastResult={autoCaptureResult}
-                  message={autoCaptureMessage}
-                  onAutoCapture={() => runNarwashiAutoCapture(true)}
-                  onAutoFill={() => runNarwashiAutoCapture(false)}
-                  onClearCalibration={handleClearAutoCaptureCalibration}
-                  onStartCalibration={handleStartAutoCaptureCalibration}
-                />
-              ) : null}
-
-              {isDesktopShell ? (
-                <ScannerStatusPanel
-                  isRunning={scannerRunning}
-                  latestSnapshot={scannerLatestSnapshot}
-                  pendingGains={scannerPendingGains}
-                  lastScanAt={lastScanAt}
-                  scannerError={scannerError}
-                  onStart={handleStartScanner}
-                  onStop={handleStopScanner}
-                  onResetPending={handleResetPendingRound}
-                  onEndRound={handleEndScannerRound}
-                  selectedMap={selectedMap}
-                />
-              ) : null}
-
-              <CapturePanel
-                formMessage={formMessage}
-                handleCaptureRound={handleCaptureRound}
-                handleInventoryChange={handleInventoryChange}
-                inventoryInputs={inventoryInputs}
-                isDesktopShell={isDesktopShell}
-                isOverlayMode
-                onOpenOverlay={handleOpenOverlay}
-                projectedRoundGain={projectedRoundGain}
-                roundGains={roundGains}
-                selectedMap={selectedMap}
-                selectedSession={selectedSession}
-                nextRoundNumber={nextRoundNumber}
+      <main className="overlay-shell overlay-shell-compact">
+        <header className="overlay-compact-header">
+          <div className="overlay-compact-drag">
+            <span className="overlay-compact-title">FarmTracks</span>
+            <span className="overlay-compact-map">{selectedMap.name}</span>
+          </div>
+          <div className="overlay-compact-controls">
+            <label className="overlay-opacity-mini" title="Opacity">
+              <input
+                type="range"
+                min="45"
+                max="100"
+                step="1"
+                value={overlayOpacity}
+                onChange={(e) => handleOverlayOpacityChange(Number(e.target.value))}
               />
-            </>
-          ) : (
-            <section className="page-panel onboarding-panel">
-              <div className="title-plate compact">
-                <p className="eyebrow">Ready Room</p>
-                <h2>Preparing Local Session</h2>
-                <div className="title-divider" />
-              </div>
-              <p className="subtle-text">FarmTracks is preparing the overlay session.</p>
-            </section>
-          )}
-        </main>
-        {calibrationSession ? (
-          <AutoCaptureCalibrationModal
-            session={calibrationSession}
-            onCancel={() => setCalibrationSession(null)}
-            onRetake={handleRetakeAutoCaptureCalibration}
-            onSelect={handleSelectCalibrationPoint}
+            </label>
+            {isDesktopShell ? (
+              <button type="button" className="overlay-icon-btn" onClick={handleOpenMainWindow} title="Open dashboard">⊞</button>
+            ) : null}
+            <button type="button" className="overlay-icon-btn" onClick={handleCloseOverlay} title="Close">✕</button>
+          </div>
+        </header>
+
+        <div className="overlay-map-tabs" role="tablist">
+          {MAPS.map((map) => (
+            <button
+              key={map.id}
+              type="button"
+              role="tab"
+              aria-selected={map.id === selectedMapId}
+              className={`overlay-map-tab ${map.id === selectedMapId ? "active" : ""}`}
+              onClick={() => setSelectedMapId(map.id)}
+            >
+              {map.name}
+            </button>
+          ))}
+        </div>
+
+        {selectedPlayer ? (
+          <OverlayScannerPanel
+            isRunning={scannerRunning}
+            latestSnapshot={scannerLatestSnapshot}
+            pendingGains={scannerPendingGains}
+            lastScanAt={lastScanAt}
+            scannerError={scannerError}
+            onStart={handleStartScanner}
+            onStop={handleStopScanner}
+            onResetPending={handleResetPendingRound}
+            onEndRound={handleEndScannerRound}
+            selectedMap={selectedMap}
+            selectedSession={selectedSession}
+            nextRoundNumber={nextRoundNumber}
+            formMessage={formMessage}
           />
-        ) : null}
-      </>
+        ) : (
+          <p className="overlay-scanner-waiting">Preparing session…</p>
+        )}
+      </main>
     );
   }
 
