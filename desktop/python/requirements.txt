@@ -1,0 +1,6 @@
+mss>=9.0.1
+opencv-python>=4.9.0
+numpy>=1.26.0
+pytesseract>=0.3.10
+# Optional – uncomment if you prefer EasyOCR instead of pytesseract:
+# easyocr>=1.7.1

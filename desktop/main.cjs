@@ -1,8 +1,9 @@
 const path = require("path");
 const fs = require("fs/promises");
 const os = require("os");
-const { execFile } = require("child_process");
-const { app, BrowserWindow, ipcMain, nativeImage, screen } = require("electron");
+const { execFile, spawn } = require("child_process");
+const readline = require("readline");
+const { app, BrowserWindow, ipcMain, nativeImage, screen, globalShortcut } = require("electron");
 const screenshot = require("screenshot-desktop");
 
 const OVERLAY_QUERY = "capture-overlay";
@@ -16,6 +17,12 @@ let mainWindow = null;
 let overlayWindow = null;
 let pendingOverlayOptions = {};
 let cachedAutoHotkeyPath = undefined;
+
+// Python scanner worker state
+let pythonWorker = null;
+let pythonWorkerRunning = false;
+let pythonWorkerRestartTimer = null;
+const PYTHON_RESTART_DELAY_MS = 3000;
 
 const singleInstanceLock = app.requestSingleInstanceLock();
 
@@ -311,6 +318,123 @@ async function runAutoHotkeyDetector(profile) {
   }
 }
 
+function getPythonWorkerPath() {
+  if (app.isPackaged) {
+    // Packaged: use the compiled farmtracks-capture.exe in extraResources
+    return path.join(process.resourcesPath, "python", "farmtracks-capture", "farmtracks-capture.exe");
+  }
+  // Development: run the script directly with python
+  return null; // signals to use python command
+}
+
+function getPythonCommand() {
+  if (app.isPackaged) {
+    return { cmd: getPythonWorkerPath(), args: [] };
+  }
+  const script = path.join(__dirname, "python", "capture_worker.py");
+  return { cmd: "python", args: [script] };
+}
+
+function broadcastToAllWindows(channel, payload) {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel, payload);
+    }
+  });
+}
+
+function startPythonWorker() {
+  if (pythonWorker) return; // already running
+
+  const { cmd, args } = getPythonCommand();
+
+  try {
+    pythonWorker = spawn(cmd, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+  } catch (err) {
+    broadcastToAllWindows("farmtracks:scanner-update", {
+      type: "error",
+      ok: false,
+      message: `Failed to start Python worker: ${err.message}`,
+      debug: {},
+    });
+    schedulePythonWorkerRestart();
+    return;
+  }
+
+  pythonWorkerRunning = true;
+
+  const rl = readline.createInterface({ input: pythonWorker.stdout });
+
+  rl.on("line", (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    try {
+      const payload = JSON.parse(trimmed);
+      broadcastToAllWindows("farmtracks:scanner-update", payload);
+    } catch (_) {
+      // Non-JSON stdout — ignore silently
+    }
+  });
+
+  pythonWorker.stderr.on("data", (chunk) => {
+    const text = chunk.toString().trim();
+    if (text) {
+      console.error("[python-worker]", text);
+    }
+  });
+
+  pythonWorker.on("close", (code) => {
+    pythonWorker = null;
+    pythonWorkerRunning = false;
+    if (code !== 0 && code !== null) {
+      broadcastToAllWindows("farmtracks:scanner-update", {
+        type: "error",
+        ok: false,
+        message: `Python worker exited with code ${code}. Restarting...`,
+        debug: { exitCode: code },
+      });
+      schedulePythonWorkerRestart();
+    }
+  });
+
+  pythonWorker.on("error", (err) => {
+    broadcastToAllWindows("farmtracks:scanner-update", {
+      type: "error",
+      ok: false,
+      message: `Python worker error: ${err.message}`,
+      debug: {},
+    });
+    pythonWorker = null;
+    pythonWorkerRunning = false;
+    schedulePythonWorkerRestart();
+  });
+}
+
+function stopPythonWorker() {
+  if (pythonWorkerRestartTimer) {
+    clearTimeout(pythonWorkerRestartTimer);
+    pythonWorkerRestartTimer = null;
+  }
+  if (pythonWorker) {
+    pythonWorkerRunning = false;
+    pythonWorker.kill("SIGTERM");
+    pythonWorker = null;
+  }
+}
+
+function schedulePythonWorkerRestart() {
+  if (pythonWorkerRestartTimer) return;
+  pythonWorkerRestartTimer = setTimeout(() => {
+    pythonWorkerRestartTimer = null;
+    if (!pythonWorkerRunning) {
+      startPythonWorker();
+    }
+  }, PYTHON_RESTART_DELAY_MS);
+}
+
 function registerProtocolClient() {
   if (process.defaultApp && process.argv.length >= 2) {
     app.setAsDefaultProtocolClient(CUSTOM_PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
@@ -458,6 +582,30 @@ ipcMain.handle("farmtracks:close-window", (event) => {
   currentWindow?.close();
 });
 
+ipcMain.handle("farmtracks:scanner-start", () => {
+  startPythonWorker();
+  return { running: pythonWorkerRunning };
+});
+
+ipcMain.handle("farmtracks:scanner-stop", () => {
+  stopPythonWorker();
+  return { running: false };
+});
+
+ipcMain.handle("farmtracks:scanner-status", () => ({
+  running: pythonWorkerRunning,
+}));
+
+ipcMain.handle("farmtracks:scanner-reset-pending", () => {
+  broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "reset-pending" });
+  return { ok: true };
+});
+
+ipcMain.handle("farmtracks:scanner-end-round", () => {
+  broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "end-round" });
+  return { ok: true };
+});
+
 function focusMainWindow() {
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isMinimized()) {
     mainWindow.restore();
@@ -524,6 +672,31 @@ app.whenReady().then(async () => {
       createOverlayWindow();
     }
   });
+
+  // F7 = toggle overlay visibility
+  globalShortcut.register("F7", () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      if (overlayWindow.isVisible()) {
+        overlayWindow.hide();
+      } else {
+        overlayWindow.show();
+        overlayWindow.focus();
+      }
+    }
+  });
+
+  // F8 = reset pending round baseline
+  globalShortcut.register("F8", () => {
+    broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "reset-pending" });
+  });
+
+  // F9 = end / save current round
+  globalShortcut.register("F9", () => {
+    broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "end-round" });
+  });
+
+  // Auto-start the Python scanner
+  startPythonWorker();
 });
 
 app.on("window-all-closed", async () => {
@@ -532,6 +705,8 @@ app.on("window-all-closed", async () => {
       await new Promise((resolve) => localServer.close(resolve));
     }
 
+    stopPythonWorker();
+    globalShortcut.unregisterAll();
     app.quit();
   }
 });

@@ -666,6 +666,75 @@ function normalizePlayersForSingleSession(players) {
   return [primaryPlayer];
 }
 
+function ScannerStatusPanel({
+  isRunning,
+  latestSnapshot,
+  pendingGains,
+  lastScanAt,
+  scannerError,
+  onStart,
+  onStop,
+  onResetPending,
+  onEndRound,
+  selectedMap
+}) {
+  const hasGains = pendingGains && Object.values(pendingGains).some((v) => v > 0);
+  const lastScanLabel = lastScanAt ? new Date(lastScanAt).toLocaleTimeString() : "Never";
+
+  return (
+    <section className="page-panel auto-capture-panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Python Scanner</p>
+          <h2>Background inventory scanner</h2>
+          <p className="subtle-text">
+            Scans the game screen every 2–3 seconds. Press F8 to reset pending baseline, F9 to save round. F7 hides/shows overlay.
+          </p>
+        </div>
+        <div className="auto-capture-actions">
+          {isRunning ? (
+            <button type="button" className="ghost-button" onClick={onStop}>Stop scanner</button>
+          ) : (
+            <button type="button" className="secondary-button" onClick={onStart}>Start scanner</button>
+          )}
+          <button type="button" className="ghost-button" onClick={onResetPending} disabled={!isRunning}>
+            Reset baseline (F8)
+          </button>
+          <button type="button" className="primary-button" onClick={onEndRound} disabled={!hasGains}>
+            End round (F9)
+          </button>
+        </div>
+      </div>
+
+      <div className="auto-capture-meta">
+        <span className={`status-pill ${isRunning ? "" : "offline"}`}>
+          {isRunning ? "Scanner active" : "Scanner stopped"}
+        </span>
+        <span className="helper-text">Last scan: {lastScanLabel}</span>
+      </div>
+
+      {scannerError ? (
+        <p className="feedback-text">{scannerError}</p>
+      ) : null}
+
+      {latestSnapshot ? (
+        <div className="auto-capture-results">
+          <div className="meta-entry"><span>Crystals</span><strong>{latestSnapshot.crystals ?? 0}</strong></div>
+          <div className="meta-entry"><span>Arcanes</span><strong>{latestSnapshot.arcanes ?? 0}</strong></div>
+          <div className="meta-entry"><span>Speed Potions</span><strong>{latestSnapshot["speed-potions"] ?? 0}</strong></div>
+          {pendingGains ? (
+            <>
+              <div className="meta-entry"><span>Pending crystals</span><strong>+{Math.max(0, pendingGains.crystals ?? 0)}</strong></div>
+              <div className="meta-entry"><span>Pending arcanes</span><strong>+{Math.max(0, pendingGains.arcanes ?? 0)}</strong></div>
+              <div className="meta-entry"><span>Pending potions</span><strong>+{Math.max(0, pendingGains["speed-potions"] ?? 0)}</strong></div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function RoundTrendChart({ history }) {
   const points = [...history].reverse().map((entry) => getTotalItems(entry.gains));
   const maxValue = Math.max(...points, 1);
@@ -732,6 +801,13 @@ function App() {
     error: "",
     maps: []
   });
+
+  // Python scanner state
+  const [scannerLatestSnapshot, setScannerLatestSnapshot] = useState(null);
+  const [scannerPendingBaseline, setScannerPendingBaseline] = useState(null);
+  const [scannerRunning, setScannerRunning] = useState(false);
+  const [scannerError, setScannerError] = useState("");
+  const [lastScanAt, setLastScanAt] = useState(null);
 
   const selectedMap = useMemo(
     () => MAPS.find((map) => map.id === selectedMapId) ?? MAPS[0],
@@ -849,6 +925,40 @@ function App() {
     saveUiState({ guideLanguage });
   }, [guideLanguage]);
 
+  useEffect(() => {
+    if (!isDesktopShellAvailable()) return;
+
+    const unsubUpdate = window.farmtracksDesktop.onScannerUpdate((payload) => {
+      if (payload.type === "scan" && payload.ok && payload.snapshot) {
+        setScannerRunning(true);
+        setScannerError("");
+        setScannerLatestSnapshot(payload.snapshot);
+        setLastScanAt(payload.debug?.timestamp ?? new Date().toISOString());
+        setScannerPendingBaseline((prev) => prev ?? payload.snapshot);
+      } else if (payload.type === "error") {
+        setScannerError(payload.message ?? "Scanner error");
+      } else if (payload.type === "status") {
+        if (payload.status === "stopped") setScannerRunning(false);
+        if (payload.status === "ready" || payload.status === "starting") setScannerRunning(true);
+      }
+    });
+
+    const unsubHotkey = window.farmtracksDesktop.onScannerHotkey((payload) => {
+      if (payload.action === "reset-pending") {
+        setScannerPendingBaseline(scannerLatestSnapshot);
+      }
+      if (payload.action === "end-round") {
+        handleEndScannerRound();
+      }
+    });
+
+    return () => {
+      unsubUpdate();
+      unsubHotkey();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const nextRoundNumber = (selectedSession?.rounds ?? 0) + 1;
   const sessionTotal = getTotalItems(selectedSession?.totals ?? {});
   const activeSnapshotTotal = getTotalItems(selectedSession?.currentSnapshot ?? {});
@@ -862,6 +972,11 @@ function App() {
   const mapSnapshot = splitAmount(activeSnapshotTotal);
   const isDesktopShell = isDesktopShellAvailable();
   const isNarwashiAutoCaptureAvailable = isDesktopShell && selectedMap.id === "narwashi";
+
+  const scannerPendingGains = useMemo(() => {
+    if (!scannerLatestSnapshot || !scannerPendingBaseline) return null;
+    return getRoundGains(scannerPendingBaseline, scannerLatestSnapshot);
+  }, [scannerLatestSnapshot, scannerPendingBaseline]);
 
   function handleInventoryChange(itemId, field, nextValue) {
     setInventoryInputs((current) => ({
@@ -1100,6 +1215,39 @@ function App() {
     }
   }
 
+  function handleStartScanner() {
+    if (isDesktopShell) {
+      window.farmtracksDesktop.startScanner();
+      setScannerRunning(true);
+    }
+  }
+
+  function handleStopScanner() {
+    if (isDesktopShell) {
+      window.farmtracksDesktop.stopScanner();
+      setScannerRunning(false);
+    }
+  }
+
+  function handleResetPendingRound() {
+    setScannerPendingBaseline(scannerLatestSnapshot);
+  }
+
+  function handleEndScannerRound() {
+    if (!scannerLatestSnapshot || !selectedPlayer) return;
+
+    const hasGains = scannerPendingGains && Object.values(scannerPendingGains).some((v) => v > 0);
+    if (!hasGains) {
+      setFormMessage("No positive gains detected since the last baseline. Press Reset baseline (F8) first.");
+      return;
+    }
+
+    const captured = applySnapshot(scannerLatestSnapshot, "Python scanner");
+    if (captured) {
+      setScannerPendingBaseline(scannerLatestSnapshot);
+    }
+  }
+
   if (isOverlayMode) {
     return (
       <>
@@ -1156,6 +1304,21 @@ function App() {
                   onAutoFill={() => runNarwashiAutoCapture(false)}
                   onClearCalibration={handleClearAutoCaptureCalibration}
                   onStartCalibration={handleStartAutoCaptureCalibration}
+                />
+              ) : null}
+
+              {isDesktopShell ? (
+                <ScannerStatusPanel
+                  isRunning={scannerRunning}
+                  latestSnapshot={scannerLatestSnapshot}
+                  pendingGains={scannerPendingGains}
+                  lastScanAt={lastScanAt}
+                  scannerError={scannerError}
+                  onStart={handleStartScanner}
+                  onStop={handleStopScanner}
+                  onResetPending={handleResetPendingRound}
+                  onEndRound={handleEndScannerRound}
+                  selectedMap={selectedMap}
                 />
               ) : null}
 
@@ -1359,6 +1522,21 @@ function App() {
                   onAutoFill={() => runNarwashiAutoCapture(false)}
                   onClearCalibration={handleClearAutoCaptureCalibration}
                   onStartCalibration={handleStartAutoCaptureCalibration}
+                />
+              ) : null}
+
+              {isDesktopShell ? (
+                <ScannerStatusPanel
+                  isRunning={scannerRunning}
+                  latestSnapshot={scannerLatestSnapshot}
+                  pendingGains={scannerPendingGains}
+                  lastScanAt={lastScanAt}
+                  scannerError={scannerError}
+                  onStart={handleStartScanner}
+                  onStop={handleStopScanner}
+                  onResetPending={handleResetPendingRound}
+                  onEndRound={handleEndScannerRound}
+                  selectedMap={selectedMap}
                 />
               ) : null}
 

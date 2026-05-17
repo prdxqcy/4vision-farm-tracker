@@ -7,5 +7,24 @@ contextBridge.exposeInMainWorld("farmtracksDesktop", {
   closeCurrentWindow: () => ipcRenderer.invoke("farmtracks:close-window"),
   openMainWindow: () => ipcRenderer.invoke("farmtracks:open-main-window"),
   openOverlayWindow: () => ipcRenderer.invoke("farmtracks:open-overlay"),
-  setOverlayOpacity: (opacity) => ipcRenderer.invoke("farmtracks:set-overlay-opacity", opacity)
+  setOverlayOpacity: (opacity) => ipcRenderer.invoke("farmtracks:set-overlay-opacity", opacity),
+
+  // Scanner control
+  startScanner: () => ipcRenderer.invoke("farmtracks:scanner-start"),
+  stopScanner: () => ipcRenderer.invoke("farmtracks:scanner-stop"),
+  getScannerStatus: () => ipcRenderer.invoke("farmtracks:scanner-status"),
+  resetPendingRound: () => ipcRenderer.invoke("farmtracks:scanner-reset-pending"),
+  endScannerRound: () => ipcRenderer.invoke("farmtracks:scanner-end-round"),
+
+  // Scanner event subscriptions
+  onScannerUpdate: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("farmtracks:scanner-update", handler);
+    return () => ipcRenderer.removeListener("farmtracks:scanner-update", handler);
+  },
+  onScannerHotkey: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("farmtracks:scanner-hotkey", handler);
+    return () => ipcRenderer.removeListener("farmtracks:scanner-hotkey", handler);
+  },
 });
