@@ -95,6 +95,16 @@ CONFIG_FILE = os.path.join(BASE_DIR, "capture_config.json")
 #   - "instances"  : count every match separately (e.g. crystals in slots)
 #   - "best-stack" : read OCR stack number from the best match (e.g. arcanes)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Template matching thresholds (tune after adding real templates)
+# ---------------------------------------------------------------------------
+MATCH_THRESHOLD = 0.60        # default threshold for arcanes/potions
+CRYSTAL_THRESHOLD = 0.82      # crystals need a high score — many bag icons look similar
+MAX_SCREENSHOT_WIDTH = 1920   # downsample wide screenshots to cap memory usage
+DEDUP_DISTANCE_PX = 30        # merge candidates within this many pixels (bigger = fewer duplicates)
+SCALES = [0.94, 1.0, 1.06]   # 3 scales instead of 5 — faster, less RAM, good enough
+STABILITY_WINDOW = 2          # report median count over this many consecutive scans
+
 ITEM_CONFIGS = [
     {
         "id": "crystals",
@@ -121,16 +131,6 @@ ITEM_CONFIGS = [
         "threshold": MATCH_THRESHOLD,
     },
 ]
-
-# ---------------------------------------------------------------------------
-# Template matching thresholds (tune after adding real templates)
-# ---------------------------------------------------------------------------
-MATCH_THRESHOLD = 0.60        # default threshold for arcanes/potions
-CRYSTAL_THRESHOLD = 0.82      # crystals need a high score — many bag icons look similar
-MAX_SCREENSHOT_WIDTH = 1920   # downsample wide screenshots to cap memory usage
-DEDUP_DISTANCE_PX = 30        # merge candidates within this many pixels (bigger = fewer duplicates)
-SCALES = [0.94, 1.0, 1.06]   # 3 scales instead of 5 — faster, less RAM, good enough
-STABILITY_WINDOW = 3          # report median count over this many consecutive scans
 
 # ---------------------------------------------------------------------------
 # Calibration / scan region config
@@ -297,20 +297,23 @@ def find_template_matches(screenshot, template, max_matches, threshold=MATCH_THR
 
 def read_stack_count(screenshot, match):
     """
-    Try to OCR a small region just below/around the matched slot to read
-    the numeric stack count (0–999).
-    Returns an integer, or 1 if OCR is unavailable or fails.
+    OCR the numeric stack count from the inventory slot.
+    Stack numbers appear in the bottom-right corner of the slot icon.
+    Returns an integer >= 1, or 1 if OCR fails.
     """
     x = match["x"]
     y = match["y"]
     w = match["w"]
     h = match["h"]
 
-    # Stack counts appear in the bottom-right corner of the inventory slot icon
-    roi_x1 = max(0, x + w // 2)
-    roi_y1 = max(0, y + h // 2)
-    roi_x2 = min(screenshot.shape[1], x + w + 6)
-    roi_y2 = min(screenshot.shape[0], y + h + 6)
+    # Capture bottom half of slot + generous padding below/right so the
+    # number is always included even if it overflows the template bounds.
+    pad_x = max(12, w // 3)
+    pad_y = max(12, h // 3)
+    roi_x1 = max(0, x)                                        # full width
+    roi_y1 = max(0, y + h // 2)                               # bottom half
+    roi_x2 = min(screenshot.shape[1], x + w + pad_x)
+    roi_y2 = min(screenshot.shape[0], y + h + pad_y)
     roi = screenshot[roi_y1:roi_y2, roi_x1:roi_x2]
 
     if roi.size == 0:
@@ -319,18 +322,30 @@ def read_stack_count(screenshot, match):
     if HAS_TESSERACT:
         try:
             gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-            # Scale up tiny ROI for better OCR accuracy
-            if gray.shape[0] < 24:
-                gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-            # Try both polarities — game UIs use white-on-dark or dark-on-light
+            # Always upscale to at least 64px tall — Tesseract struggles on tiny images
+            target_h = max(64, gray.shape[0])
+            scale_up = target_h / gray.shape[0]
+            gray = cv2.resize(gray, None, fx=scale_up, fy=scale_up, interpolation=cv2.INTER_CUBIC)
+
+            digits_found = None
+            # Try multiple preprocessing strategies
             for invert in (False, True):
                 src = cv2.bitwise_not(gray) if invert else gray
-                _, thresh = cv2.threshold(src, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                config_str = "--psm 8 -c tessedit_char_whitelist=0123456789"
-                text = pytesseract.image_to_string(thresh, config=config_str).strip()
-                digits = "".join(ch for ch in text if ch.isdigit())
-                if digits:
-                    return min(999, int(digits))
+                for thresh_method in (cv2.THRESH_BINARY + cv2.THRESH_OTSU,):
+                    _, thresh = cv2.threshold(src, 0, 255, thresh_method)
+                    for psm in ("7", "8", "13"):
+                        cfg = f"--psm {psm} -c tessedit_char_whitelist=0123456789"
+                        text = pytesseract.image_to_string(thresh, config=cfg).strip()
+                        digits = "".join(ch for ch in text if ch.isdigit())
+                        if digits:
+                            digits_found = digits
+                            break
+                    if digits_found:
+                        break
+                if digits_found:
+                    break
+            if digits_found:
+                return min(999, int(digits_found))
         except Exception:
             pass
 
@@ -391,11 +406,16 @@ def scan_inventory(config):
             raw = len(matches)
         elif item_cfg["count_mode"] == "best-stack":
             if matches:
-                best = max(matches, key=lambda m: m["score"])
-                ocr_val = read_stack_count(screenshot, best)
-                # If OCR falls back to 1 but we found multiple matches,
-                # count slots instead (handles games where stacks appear as separate slots)
-                raw = ocr_val if (ocr_val > 1 or len(matches) == 1) else len(matches)
+                # Try OCR on ALL matches and take the highest digit found,
+                # since the best-score match might not have the clearest number.
+                ocr_best = 1
+                for m in matches:
+                    val = read_stack_count(screenshot, m)
+                    if val > ocr_best:
+                        ocr_best = val
+                # If every OCR attempt returned 1 but we found multiple slots,
+                # use slot count as a floor (handles per-slot stacking).
+                raw = ocr_best if ocr_best > 1 else len(matches)
             else:
                 raw = 0
         else:

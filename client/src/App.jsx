@@ -1657,199 +1657,177 @@ function App() {
     : null;
 
   return (
-    <div className="landing-shell">
-      <header className="landing-topbar">
-        <a className="landing-brand" href="https://vision4s.com/" target="_blank" rel="noreferrer">
-          <img src="/vision4-assets/vision4-logo.png" alt="4Vision" className="brand-logo" />
-          <span>FarmTracks Overlay</span>
+    <div className="site-shell">
+      <nav className="site-nav">
+        <a className="site-nav-brand" href="https://vision4s.com/" target="_blank" rel="noreferrer">
+          <img src="/vision4-assets/vision4-logo.png" alt="4Vision" />
+          <span>FarmTracks</span>
         </a>
-        <div className="landing-topbar-meta">
-          <span className={`live-indicator ${apiState.error ? "offline" : ""}`}>
-            {apiState.loading ? "Syncing route data" : apiState.error ? "Offline metadata" : "Route data ready"}
-          </span>
-          <a className="landing-inline-link" href="#download">Download</a>
+        <div className="site-nav-links">
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How It Works</a>
+          <a href="#download">Download</a>
+          <a href="https://vision4s.com/" target="_blank" rel="noreferrer">4Vision</a>
         </div>
-      </header>
+        <div className="site-nav-spacer" />
+        <a className="site-nav-cta" href={OVERLAY_INSTALLER_URL} target="_blank" rel="noreferrer" onClick={handleInstallOverlay}>
+          Download
+        </a>
+      </nav>
 
-      <main className="landing-main">
-        <section className="landing-hero">
-          <div className="landing-hero-copy">
-            <p className="eyebrow">4Vision Farming Toolkit</p>
-            <h1>The website introduces FarmTracks. The overlay does the work.</h1>
-            <p className="landing-lede">
-              FarmTracks is now centered around a native Windows overlay for scanning, manual corrections,
-              and always-on-top in-game tracking. The web app becomes the launchpad: learn what it does,
-              pick your route, and install or open the overlay in one click.
+      <section className="site-hero">
+        <div className="site-hero-inner">
+          <p className="site-hero-eyebrow">4Vision Farming Tool</p>
+          <h1 className="site-hero-title">FarmTracks Overlay</h1>
+          <p className="site-hero-sub">
+            Real-time item scanner for Narwashi runs. An always-on-top overlay that counts crystals,
+            arcanes and speed potions automatically — so you can focus on farming.
+          </p>
+          <a
+            className="site-hero-btn"
+            href={OVERLAY_INSTALLER_URL}
+            target="_blank"
+            rel="noreferrer"
+            onClick={handleInstallOverlay}
+          >
+            Download for Windows
+          </a>
+        </div>
+      </section>
+
+      <section id="features" style={{ maxWidth: 1100, margin: "0 auto", width: "100%", padding: "72px 24px 0" }}>
+        <div className="site-section-head">
+          <h2>What it does</h2>
+          <div className="site-rule" />
+        </div>
+      </section>
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", width: "100%", padding: "0 24px 72px" }}>
+        <div className="site-feature">
+          <div className="site-feature-text">
+            <h3>Auto-Scanner</h3>
+            <p>
+              Scans your bag every second and counts crystals, arcanes and speed potions automatically.
+              No clicking, no manual input — just keep farming and the overlay keeps up.
             </p>
+          </div>
+          <div className="site-feature-visual" />
+        </div>
 
-            <div className="landing-hero-actions">
-              <a
-                className="primary-button landing-cta"
-                href={OVERLAY_INSTALLER_URL}
-                onClick={handleInstallOverlay}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Download Overlay for Windows
-              </a>
-              <button type="button" className="secondary-button landing-cta" onClick={handleLaunchOverlayApp}>
-                {isDesktopShell ? "Open Overlay" : "Launch Installed Overlay"}
-              </button>
+        <div className="site-feature site-feature-flip">
+          <div className="site-feature-text">
+            <h3>Bag Area Selector</h3>
+            <p>
+              Draw a box over your inventory once. From then on the scanner only looks inside that region —
+              no false reads from the rest of the screen.
+            </p>
+          </div>
+          <div className="site-feature-visual" />
+        </div>
+
+        <div className="site-feature">
+          <div className="site-feature-text">
+            <h3>Hotkeys</h3>
+            <p>
+              F7 shows or hides the overlay. F8 resets the item baseline. F9 records a round.
+              All three are rebindable from inside the overlay.
+            </p>
+          </div>
+          <div className="site-feature-visual" />
+        </div>
+
+        <div className="site-feature site-feature-flip">
+          <div className="site-feature-text">
+            <h3>Round Tracking</h3>
+            <p>
+              Every time your count increases, FarmTracks logs the gain. See what you collected each run
+              and across your whole farming session without leaving the game.
+            </p>
+          </div>
+          <div className="site-feature-visual" />
+        </div>
+      </div>
+
+      <section id="how-it-works" className="site-section">
+        <div className="site-section-head">
+          <h2>How to use it</h2>
+          <div className="site-rule" />
+        </div>
+        <ol className="site-steps">
+          <li>
+            <span className="site-step-num">01</span>
+            <div>
+              <h3>Download and install</h3>
+              <p>Run the Windows installer. It sets up the overlay and registers the farmtracks:// link so you can relaunch it from any browser.</p>
             </div>
-
-            <div className="landing-hero-notes">
-              <span>Always-on-top overlay window</span>
-              <span>Scanner + manual input inside the app</span>
-              <span>Route-aware launch with deep links</span>
+          </li>
+          <li>
+            <span className="site-step-num">02</span>
+            <div>
+              <h3>Open the overlay</h3>
+              <p>Launch FarmTracks from your desktop shortcut or press the button on this page. Drag it next to your game HUD.</p>
             </div>
-          </div>
-
-          <div className="landing-hero-panel">
-            <div className="landing-orb" />
-            <div className="landing-preview-card">
-              <span className="landing-preview-kicker">Preferred route</span>
-              <strong>{selectedMap.name}</strong>
-              <p>{preferredMapDetails?.notes ?? selectedMap.note}</p>
-              <div className="landing-route-pills">
-                {selectedMap.items.map((item) => (
-                  <span key={item.id}>{item.name}</span>
-                ))}
-              </div>
+          </li>
+          <li>
+            <span className="site-step-num">03</span>
+            <div>
+              <h3>Set your bag area</h3>
+              <p>Click "Set bag area" in the overlay and drag a box around your inventory. The scanner only looks there from now on.</p>
             </div>
+          </li>
+          <li>
+            <span className="site-step-num">04</span>
+            <div>
+              <h3>Start the scanner and farm</h3>
+              <p>Press Start. The overlay reads your bag every second. Hit F9 to save a round whenever you finish a run.</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section id="download" className="site-section site-download">
+        <div className="site-section-head">
+          <h2>Get FarmTracks</h2>
+          <div className="site-rule" />
+        </div>
+        <p className="site-download-sub">Free Windows overlay. No account needed.</p>
+        <div className="site-download-actions">
+          <a
+            className="site-hero-btn"
+            href={OVERLAY_INSTALLER_URL}
+            target="_blank"
+            rel="noreferrer"
+            onClick={handleInstallOverlay}
+          >
+            Download Installer
+          </a>
+          <button type="button" className="site-launch-btn" onClick={handleLaunchOverlayApp}>
+            Launch Overlay
+          </button>
+        </div>
+        {overlayGuideContent ? (
+          <div className="site-guide">
+            <p className="site-guide-eyebrow">{overlayGuideContent.eyebrow}</p>
+            <h3>{overlayGuideContent.title}</h3>
+            <ol>
+              {overlayGuideContent.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <button type="button" className="site-guide-dismiss" onClick={() => setOverlayGuideMode("")}>Dismiss</button>
           </div>
-        </section>
+        ) : null}
+      </section>
 
-        <section className="landing-section">
-          <div className="landing-section-heading">
-            <p className="eyebrow">Why the change</p>
-            <h2>The browser no longer needs to be the dashboard</h2>
-          </div>
-
-          <div className="landing-feature-grid">
-            <article className="landing-feature-card">
-              <h3>Overlay-first workflow</h3>
-              <p>The native app keeps scanning, hotkeys, and manual round saves where they belong: beside the game.</p>
-            </article>
-            <article className="landing-feature-card">
-              <h3>Cleaner public website</h3>
-              <p>This site can focus on onboarding, explaining the product, and getting players into the overlay quickly.</p>
-            </article>
-            <article className="landing-feature-card">
-              <h3>Fewer moving parts in browser</h3>
-              <p>No more asking the website to behave like an in-game tool when the desktop overlay already does that better.</p>
-            </article>
-          </div>
-        </section>
-
-        <section className="landing-section" id="download">
-          <div className="landing-section-heading">
-            <p className="eyebrow">Download & Launch</p>
-            <h2>Install once, then reopen FarmTracks from the website anytime</h2>
-          </div>
-
-          <div className="landing-download-grid">
-            <article className="landing-download-card landing-download-card-primary">
-              <span className="landing-card-kicker">Windows overlay app</span>
-              <h3>FarmTracks Overlay Setup</h3>
-              <p>
-                Download the desktop app for the full experience: overlay window, capture scanner,
-                hotkeys, and map-aware launch links.
-              </p>
-              <div className="landing-download-actions">
-                <a
-                  className="primary-button landing-cta"
-                  href={OVERLAY_INSTALLER_URL}
-                  onClick={handleInstallOverlay}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Download Installer
-                </a>
-                <button type="button" className="ghost-button landing-cta" onClick={handleLaunchOverlayApp}>
-                  Open Installed Overlay
-                </button>
-              </div>
-              <ol className="landing-step-list">
-                <li>Download and run the Windows installer.</li>
-                <li>Let it register the `farmtracks://` launcher.</li>
-                <li>Come back here and launch your route directly from the browser.</li>
-              </ol>
-            </article>
-
-            <article className="landing-download-card">
-              <span className="landing-card-kicker">Choose your route</span>
-              <h3>Launch straight into the right overlay</h3>
-              <p>
-                Your selection is saved locally so the next launch request opens the overlay on the same route.
-              </p>
-              <div className="landing-map-grid" role="tablist" aria-label="Overlay route selector">
-                {MAPS.map((map) => (
-                  <button
-                    key={map.id}
-                    type="button"
-                    className={`landing-map-card ${map.id === selectedMapId ? "active" : ""}`}
-                    onClick={() => setSelectedMapId(map.id)}
-                  >
-                    <strong>{map.name}</strong>
-                    <span>{map.subtitle}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="landing-route-note">
-                <strong>{selectedMap.name}</strong>
-                <span>{preferredMapDetails?.notes ?? selectedMap.note}</span>
-              </div>
-            </article>
-          </div>
-
-          {overlayGuideContent ? (
-            <article className="landing-guide-panel">
-              <div>
-                <p className="eyebrow">{overlayGuideContent.eyebrow}</p>
-                <h3>{overlayGuideContent.title}</h3>
-              </div>
-              <ol className="landing-step-list">
-                {overlayGuideContent.steps.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-              <button type="button" className="ghost-button landing-guide-dismiss" onClick={() => setOverlayGuideMode("")}>
-                Dismiss
-              </button>
-            </article>
-          ) : null}
-        </section>
-
-        <section className="landing-section">
-          <div className="landing-section-heading">
-            <p className="eyebrow">Supported Routes</p>
-            <h2>Current farming maps in FarmTracks</h2>
-          </div>
-
-          <div className="landing-routes-grid">
-            {MAPS.map((map) => {
-              const routeDetails = apiState.maps.find((entry) => entry.id === map.id);
-
-              return (
-                <article key={map.id} className="landing-route-card">
-                  <div className="landing-route-head">
-                    <h3>{map.name}</h3>
-                    <button type="button" className="ghost-button" onClick={() => setSelectedMapId(map.id)}>
-                      Select
-                    </button>
-                  </div>
-                  <p>{routeDetails?.notes ?? map.note}</p>
-                  <div className="landing-route-pills">
-                    {map.items.map((item) => (
-                      <span key={item.id}>{item.name}</span>
-                    ))}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      </main>
+      <footer className="site-footer">
+        <img src="/vision4-assets/vision4-logo.png" alt="4Vision" className="site-footer-logo" />
+        <div className="site-footer-links">
+          <a href="https://vision4s.com/" target="_blank" rel="noreferrer">4Vision</a>
+          <a href={OVERLAY_INSTALLER_URL} target="_blank" rel="noreferrer">Download</a>
+          <a href="https://github.com/prdxqcy/4vision-farm-tracker" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+        <p className="site-footer-copy">FarmTracks Overlay — 4Vision Farming Tool</p>
+      </footer>
     </div>
   );
 }
