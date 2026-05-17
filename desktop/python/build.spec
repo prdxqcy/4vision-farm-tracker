@@ -13,10 +13,9 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        # Ship template images and config alongside the exe
+        # Ship template images alongside the exe
         ('templates', 'templates'),
-        ('capture_config.json', '.') if os.path.isfile('capture_config.json') else ('', ''),
-    ],
+    ] + ([('capture_config.json', '.')] if os.path.isfile('capture_config.json') else []),
     hiddenimports=[
         'mss',
         'cv2',
