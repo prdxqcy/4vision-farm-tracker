@@ -1648,6 +1648,36 @@ button:disabled {
   background: rgba(0,0,0,0.18);
 }
 
+.overlay-bag-area-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.overlay-bag-area-btn {
+  background: rgba(240,192,64,0.12);
+  border: 1px solid rgba(240,192,64,0.35);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 5px;
+  transition: background 0.15s;
+  width: 100%;
+}
+
+.overlay-bag-area-btn:hover {
+  background: rgba(240,192,64,0.22);
+}
+
+.overlay-bag-area-set {
+  font-size: 10px;
+  color: #6ee7b7;
+  font-weight: 600;
+}
+
 .overlay-ocr-setup-msg {
   font-size: 10px;
   color: var(--gold-faint);

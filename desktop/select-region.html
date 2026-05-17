@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+    #canvas { display: block; cursor: crosshair; }
+    #hint {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10,10,16,0.88);
+      color: #f0c040;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+      z-index: 10;
+      border: 1px solid rgba(240,192,64,0.3);
+    }
+    #confirm-bar {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      gap: 12px;
+      z-index: 10;
+    }
+    #confirm-bar button {
+      padding: 10px 28px;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+    }
+    #btn-confirm { background: #f0c040; color: #05070b; }
+    #btn-redo    { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+    #btn-cancel  { background: rgba(255,255,255,0.07); color: #aaa; border: 1px solid rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body>
+  <div id="hint">Drag a box around ALL your open bags, then release</div>
+  <div id="confirm-bar">
+    <button id="btn-cancel">Cancel</button>
+    <button id="btn-redo">Redo</button>
+    <button id="btn-confirm">Confirm area</button>
+  </div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const { ipcRenderer } = require("electron");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const hint = document.getElementById("hint");
+    const bar = document.getElementById("confirm-bar");
+
+    canvas.width  = window.screen.width;
+    canvas.height = window.screen.height;
+
+    let start = null;
+    let sel   = null;
+
+    function drawOverlay(s) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(0,0,0,0.50)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (!s) return;
+      // Cut out the selected area so it looks highlighted
+      ctx.clearRect(s.x, s.y, s.w, s.h);
+      ctx.strokeStyle = "#f0c040";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(s.x, s.y, s.w, s.h);
+    }
+
+    drawOverlay(null);
+
+    canvas.addEventListener("mousedown", (e) => {
+      start = { x: e.clientX, y: e.clientY };
+      sel = null;
+      bar.style.display = "none";
+      hint.textContent = "Hold and drag to the bottom-right corner of your bags";
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+      if (!start) return;
+      sel = {
+        x: Math.min(start.x, e.clientX),
+        y: Math.min(start.y, e.clientY),
+        w: Math.abs(e.clientX - start.x),
+        h: Math.abs(e.clientY - start.y),
+      };
+      drawOverlay(sel);
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      if (!sel || sel.w < 30 || sel.h < 30) {
+        start = null; sel = null;
+        drawOverlay(null);
+        hint.textContent = "Drag a box around ALL your open bags, then release";
+        return;
+      }
+      start = null;
+      hint.textContent = "Confirm the area or redo";
+      bar.style.display = "flex";
+    });
+
+    document.getElementById("btn-confirm").addEventListener("click", () => {
+      ipcRenderer.send("select-region:done", {
+        x: Math.round(sel.x), y: Math.round(sel.y),
+        width: Math.round(sel.w), height: Math.round(sel.h),
+      });
+    });
+
+    document.getElementById("btn-redo").addEventListener("click", () => {
+      sel = null; start = null;
+      bar.style.display = "none";
+      drawOverlay(null);
+      hint.textContent = "Drag a box around ALL your open bags, then release";
+    });
+
+    document.getElementById("btn-cancel").addEventListener("click", () => {
+      ipcRenderer.send("select-region:cancel");
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") ipcRenderer.send("select-region:cancel");
+    });
+  </script>
+</body>
+</html>

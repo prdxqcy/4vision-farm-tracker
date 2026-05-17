@@ -37,6 +37,16 @@ contextBridge.exposeInMainWorld("farmtracksDesktop", {
     return () => ipcRenderer.removeListener("farmtracks:hotkeys-updated", handler);
   },
 
+  // Scan region (bag area selector)
+  openRegionSelector: () => ipcRenderer.invoke("farmtracks:open-region-selector"),
+  getScanRegion: () => ipcRenderer.invoke("farmtracks:get-scan-region"),
+  clearScanRegion: () => ipcRenderer.invoke("farmtracks:clear-scan-region"),
+  onScanRegionUpdated: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("farmtracks:scan-region-updated", handler);
+    return () => ipcRenderer.removeListener("farmtracks:scan-region-updated", handler);
+  },
+
   // OCR auto-install progress
   onOcrSetup: (callback) => {
     const handler = (_event, payload) => callback(payload);

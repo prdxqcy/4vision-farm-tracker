@@ -793,6 +793,9 @@ function OverlayScannerPanel({
   roundGains,
   hotkeys,
   onSaveHotkeys,
+  scanRegion,
+  onSetBagArea,
+  onClearBagArea,
 }) {
   const [showManual, setShowManual] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -885,6 +888,20 @@ function OverlayScannerPanel({
         </div>
 
         {formMessage ? <p className="overlay-form-message">{formMessage}</p> : null}
+
+        <div className="overlay-bag-area-row">
+          {scanRegion ? (
+            <>
+              <span className="overlay-bag-area-set">Bag area set</span>
+              <button type="button" className="overlay-zero-btn" onClick={onSetBagArea}>Change</button>
+              <button type="button" className="overlay-zero-btn" onClick={onClearBagArea}>Clear</button>
+            </>
+          ) : (
+            <button type="button" className="overlay-bag-area-btn" onClick={onSetBagArea}>
+              Set bag area — fix detection
+            </button>
+          )}
+        </div>
 
         <div className="overlay-session-meta">
           <span>Round {nextRoundNumber}</span>
@@ -1022,6 +1039,7 @@ function App() {
   const [lastScanAt, setLastScanAt] = useState(null);
   const [resetConfirmMsg, setResetConfirmMsg] = useState("");
   const [ocrSetupMsg, setOcrSetupMsg] = useState("");
+  const [scanRegion, setScanRegion] = useState(null);
 
   // Refs so hotkey handlers always see the latest values despite the [] closure
   const scannerLatestSnapshotRef = useRef(null);
@@ -1187,6 +1205,9 @@ function App() {
       setHotkeys(hk);
     });
 
+    window.farmtracksDesktop.getScanRegion?.().then((r) => setScanRegion(r ?? null)).catch(() => {});
+    const unsubRegion = window.farmtracksDesktop.onScanRegionUpdated?.((r) => setScanRegion(r ?? null)) ?? (() => {});
+
     const unsubOcr = window.farmtracksDesktop.onOcrSetup?.((payload) => {
       if (payload.status === "done") {
         setOcrSetupMsg("");
@@ -1202,6 +1223,7 @@ function App() {
       unsubHotkey();
       unsubHotkeys();
       unsubOcr();
+      unsubRegion();
     };
   }, []);
 
@@ -1507,6 +1529,16 @@ function App() {
   handleEndScannerRoundRef.current = handleEndScannerRound;
   handleResetPendingRoundRef.current = handleResetPendingRound;
 
+  function handleSetBagArea() {
+    if (!isDesktopShell) return;
+    window.farmtracksDesktop.openRegionSelector();
+  }
+
+  function handleClearBagArea() {
+    if (!isDesktopShell) return;
+    window.farmtracksDesktop.clearScanRegion();
+  }
+
   function handleSaveHotkeys(next) {
     if (isDesktopShell) {
       window.farmtracksDesktop.setHotkeys(next);
@@ -1580,6 +1612,9 @@ function App() {
             roundGains={roundGains}
             hotkeys={hotkeys}
             onSaveHotkeys={handleSaveHotkeys}
+            scanRegion={scanRegion}
+            onSetBagArea={handleSetBagArea}
+            onClearBagArea={handleClearBagArea}
           />
         ) : (
           <p className="overlay-scanner-waiting">Preparing session…</p>
@@ -1588,43 +1623,171 @@ function App() {
     );
   }
 
-  return (
-    <div className="site-shell">
-      <div className="shell-layout">
-        <aside className="site-sidebar">
-          <div className="sidebar-frame">
-          <a className="brand-link" href="https://vision4s.com/" target="_blank" rel="noreferrer">
-            <img src="/vision4-assets/vision4-logo.png" alt="4Vision" className="brand-logo" />
-          </a>
+  const preferredMapDetails = apiState.maps.find((map) => map.id === selectedMap.id);
+  const overlayGuideContent = overlayGuideMode
+    ? {
+        install: {
+          eyebrow: "Download started",
+          title: "Install the Windows overlay",
+          steps: [
+            "Your browser should start downloading the FarmTracks Overlay installer.",
+            "If Windows SmartScreen appears, press 'More info' and then 'Run anyway' because the installer is not code-signed yet.",
+            "Finish setup and leave 'Launch FarmTracks Overlay' enabled so the desktop app registers the farmtracks:// link."
+          ]
+        },
+        launch: {
+          eyebrow: "Launch requested",
+          title: `Opening ${selectedMap.name} in the overlay`,
+          steps: [
+            "Approve the browser or Windows prompt to open FarmTracks Overlay.",
+            "If nothing opens, install the overlay first and launch it once manually.",
+            "After that, the website can reopen the native overlay directly from this page."
+          ]
+        },
+        desktop: {
+          eyebrow: "Desktop mode",
+          title: "Native overlay ready",
+          steps: [
+            `Open the always-on-top panel for ${selectedMap.name}.`,
+            "Keep the overlay near your game HUD while the desktop app handles scanning and manual corrections.",
+            "Close it anytime and reopen it from the launcher or this page."
+          ]
+        }
+      }[overlayGuideMode]
+    : null;
 
-            <div className="site-status-bar">
-              <span className={`live-indicator ${apiState.error ? "offline" : ""}`}>
-                {apiState.loading ? "Syncing" : apiState.error ? "Offline" : "Online"}
-              </span>
+  return (
+    <div className="landing-shell">
+      <header className="landing-topbar">
+        <a className="landing-brand" href="https://vision4s.com/" target="_blank" rel="noreferrer">
+          <img src="/vision4-assets/vision4-logo.png" alt="4Vision" className="brand-logo" />
+          <span>FarmTracks Overlay</span>
+        </a>
+        <div className="landing-topbar-meta">
+          <span className={`live-indicator ${apiState.error ? "offline" : ""}`}>
+            {apiState.loading ? "Syncing route data" : apiState.error ? "Offline metadata" : "Route data ready"}
+          </span>
+          <a className="landing-inline-link" href="#download">Download</a>
+        </div>
+      </header>
+
+      <main className="landing-main">
+        <section className="landing-hero">
+          <div className="landing-hero-copy">
+            <p className="eyebrow">4Vision Farming Toolkit</p>
+            <h1>The website introduces FarmTracks. The overlay does the work.</h1>
+            <p className="landing-lede">
+              FarmTracks is now centered around a native Windows overlay for scanning, manual corrections,
+              and always-on-top in-game tracking. The web app becomes the launchpad: learn what it does,
+              pick your route, and install or open the overlay in one click.
+            </p>
+
+            <div className="landing-hero-actions">
+              <a
+                className="primary-button landing-cta"
+                href={OVERLAY_INSTALLER_URL}
+                onClick={handleInstallOverlay}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Download Overlay for Windows
+              </a>
+              <button type="button" className="secondary-button landing-cta" onClick={handleLaunchOverlayApp}>
+                {isDesktopShell ? "Open Overlay" : "Launch Installed Overlay"}
+              </button>
             </div>
 
-            <nav className="site-nav sidebar-nav" aria-label="FarmTracks sections">
-              <button type="button" className="site-nav-item active">Operations</button>
-            </nav>
+            <div className="landing-hero-notes">
+              <span>Always-on-top overlay window</span>
+              <span>Scanner + manual input inside the app</span>
+              <span>Route-aware launch with deep links</span>
+            </div>
+          </div>
 
-            <section className="sidebar-panel session-identity">
-              <span className="sidebar-kicker">Local session</span>
+          <div className="landing-hero-panel">
+            <div className="landing-orb" />
+            <div className="landing-preview-card">
+              <span className="landing-preview-kicker">Preferred route</span>
               <strong>{selectedMap.name}</strong>
-              <small>{selectedPlayer ? `${selectedSession?.rounds ?? 0} live rounds on this route` : "Preparing local session"}</small>
-            </section>
-
-            <section className="sidebar-panel">
-              <div className="sidebar-section-head">
-                <h2>Map Focus</h2>
-                <p className="subtle-text">Swap routes from the control rail.</p>
+              <p>{preferredMapDetails?.notes ?? selectedMap.note}</p>
+              <div className="landing-route-pills">
+                {selectedMap.items.map((item) => (
+                  <span key={item.id}>{item.name}</span>
+                ))}
               </div>
+            </div>
+          </div>
+        </section>
 
-              <div className="sidebar-map-list" role="tablist" aria-label="Map selector">
+        <section className="landing-section">
+          <div className="landing-section-heading">
+            <p className="eyebrow">Why the change</p>
+            <h2>The browser no longer needs to be the dashboard</h2>
+          </div>
+
+          <div className="landing-feature-grid">
+            <article className="landing-feature-card">
+              <h3>Overlay-first workflow</h3>
+              <p>The native app keeps scanning, hotkeys, and manual round saves where they belong: beside the game.</p>
+            </article>
+            <article className="landing-feature-card">
+              <h3>Cleaner public website</h3>
+              <p>This site can focus on onboarding, explaining the product, and getting players into the overlay quickly.</p>
+            </article>
+            <article className="landing-feature-card">
+              <h3>Fewer moving parts in browser</h3>
+              <p>No more asking the website to behave like an in-game tool when the desktop overlay already does that better.</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="landing-section" id="download">
+          <div className="landing-section-heading">
+            <p className="eyebrow">Download & Launch</p>
+            <h2>Install once, then reopen FarmTracks from the website anytime</h2>
+          </div>
+
+          <div className="landing-download-grid">
+            <article className="landing-download-card landing-download-card-primary">
+              <span className="landing-card-kicker">Windows overlay app</span>
+              <h3>FarmTracks Overlay Setup</h3>
+              <p>
+                Download the desktop app for the full experience: overlay window, capture scanner,
+                hotkeys, and map-aware launch links.
+              </p>
+              <div className="landing-download-actions">
+                <a
+                  className="primary-button landing-cta"
+                  href={OVERLAY_INSTALLER_URL}
+                  onClick={handleInstallOverlay}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Download Installer
+                </a>
+                <button type="button" className="ghost-button landing-cta" onClick={handleLaunchOverlayApp}>
+                  Open Installed Overlay
+                </button>
+              </div>
+              <ol className="landing-step-list">
+                <li>Download and run the Windows installer.</li>
+                <li>Let it register the `farmtracks://` launcher.</li>
+                <li>Come back here and launch your route directly from the browser.</li>
+              </ol>
+            </article>
+
+            <article className="landing-download-card">
+              <span className="landing-card-kicker">Choose your route</span>
+              <h3>Launch straight into the right overlay</h3>
+              <p>
+                Your selection is saved locally so the next launch request opens the overlay on the same route.
+              </p>
+              <div className="landing-map-grid" role="tablist" aria-label="Overlay route selector">
                 {MAPS.map((map) => (
                   <button
                     key={map.id}
                     type="button"
-                    className={`sidebar-map-item ${map.id === selectedMapId ? "active" : ""}`}
+                    className={`landing-map-card ${map.id === selectedMapId ? "active" : ""}`}
                     onClick={() => setSelectedMapId(map.id)}
                   >
                     <strong>{map.name}</strong>
@@ -1632,301 +1795,61 @@ function App() {
                   </button>
                 ))}
               </div>
-            </section>
-
-            <section className="sidebar-panel sidebar-meta">
-              <div className="meta-entry">
-                <span>Persistence</span>
-                <strong>{storageError ? storageError : "Browser persistence is active for this device."}</strong>
+              <div className="landing-route-note">
+                <strong>{selectedMap.name}</strong>
+                <span>{preferredMapDetails?.notes ?? selectedMap.note}</span>
               </div>
-              <div className="meta-entry">
-                <span>Session start</span>
-                <strong>{selectedSession?.startedAt ? formatDate(selectedSession.startedAt) : "No active session"}</strong>
-              </div>
-            </section>
+            </article>
           </div>
-        </aside>
 
-        <main className="site-main">
-          <section className="title-panel">
-            <div className="title-plate">
-              <p className="eyebrow">4Vision Farm Operations</p>
-              <h1>Inventory Command Board</h1>
-              <div className="title-divider" />
-            </div>
-          </section>
-
-          {!selectedPlayer ? (
-            <section className="page-panel onboarding-panel">
-              <div className="title-plate compact">
-                <p className="eyebrow">Ready Room</p>
-                <h2>Preparing Local Session</h2>
-                <div className="title-divider" />
+          {overlayGuideContent ? (
+            <article className="landing-guide-panel">
+              <div>
+                <p className="eyebrow">{overlayGuideContent.eyebrow}</p>
+                <h3>{overlayGuideContent.title}</h3>
               </div>
-              <p className="subtle-text">
-                FarmTracks is setting up the local browser session for {selectedMap.name}. The live checkpoint board
-                will appear automatically.
-              </p>
-            </section>
-          ) : (
-            <>
-              <section className="page-panel session-panel">
-                <div className="session-hero">
-                  <div>
-                    <p className="eyebrow">Live Session</p>
-                    <h2>{selectedMap.name} farming route</h2>
-                    <p className="subtle-text">{metadataMap?.notes ?? selectedMap.note}</p>
-                  </div>
+              <ol className="landing-step-list">
+                {overlayGuideContent.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <button type="button" className="ghost-button landing-guide-dismiss" onClick={() => setOverlayGuideMode("")}>
+                Dismiss
+              </button>
+            </article>
+          ) : null}
+        </section>
 
-                  <div className="hero-actions">
-                    <button type="button" className="ghost-button" onClick={() => setShowWelcomeGuide(true)}>
-                      How it works
+        <section className="landing-section">
+          <div className="landing-section-heading">
+            <p className="eyebrow">Supported Routes</p>
+            <h2>Current farming maps in FarmTracks</h2>
+          </div>
+
+          <div className="landing-routes-grid">
+            {MAPS.map((map) => {
+              const routeDetails = apiState.maps.find((entry) => entry.id === map.id);
+
+              return (
+                <article key={map.id} className="landing-route-card">
+                  <div className="landing-route-head">
+                    <h3>{map.name}</h3>
+                    <button type="button" className="ghost-button" onClick={() => setSelectedMapId(map.id)}>
+                      Select
                     </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={handleFinishSession}
-                      disabled={!selectedSession || selectedSession.rounds === 0}
-                    >
-                      Finish session
-                    </button>
-                    <button type="button" className="ghost-button" onClick={handleResetSession}>
-                      Reset session
-                    </button>
                   </div>
-                </div>
-
-                <div className="session-stats">
-                  <article className="stat-cell">
-                    <span>Next round</span>
-                    <strong>{nextRoundNumber}</strong>
-                    <small>Checkpoint ready</small>
-                  </article>
-                  <article className="stat-cell">
-                    <span>Session rounds</span>
-                    <strong>{selectedSession?.rounds ?? 0}</strong>
-                    <small>Saved on this route</small>
-                  </article>
-                  <article className="stat-cell">
-                    <span>Session yield</span>
-                    <strong>{sessionTotal}</strong>
-                    <small>Total items earned</small>
-                  </article>
-                  <article className="stat-cell">
-                    <span>Current bag</span>
-                    <strong>{mapSnapshot.stacks}</strong>
-                    <small>{mapSnapshot.loose} loose items</small>
-                  </article>
-                  <article className="stat-cell">
-                    <span>Archived runs</span>
-                    <strong>{completedSessions}</strong>
-                    <small>Completed sessions</small>
-                  </article>
-                  <article className="stat-cell">
-                    <span>Player load</span>
-                    <strong>{allLiveRounds}</strong>
-                    <small>Rounds across all maps</small>
-                  </article>
-                </div>
-              </section>
-
-              <OverlayAccessPanel
-                guideMode={overlayGuideMode}
-                installerUrl={OVERLAY_INSTALLER_URL}
-                isDesktopShell={isDesktopShell}
-                mapName={selectedMap.name}
-                onDismiss={() => setOverlayGuideMode("")}
-                onInstall={handleInstallOverlay}
-                onLaunch={handleLaunchOverlayApp}
-              />
-
-              {isNarwashiAutoCaptureAvailable ? (
-                <AutoCapturePanel
-                  busy={autoCaptureBusy}
-                  hasProfile={Boolean(autoCaptureProfile)}
-                  lastResult={autoCaptureResult}
-                  message={autoCaptureMessage}
-                  onAutoCapture={() => runNarwashiAutoCapture(true)}
-                  onAutoFill={() => runNarwashiAutoCapture(false)}
-                  onClearCalibration={handleClearAutoCaptureCalibration}
-                  onStartCalibration={handleStartAutoCaptureCalibration}
-                />
-              ) : null}
-
-              {isDesktopShell ? (
-                <ScannerStatusPanel
-                  isRunning={scannerRunning}
-                  latestSnapshot={scannerLatestSnapshot}
-                  pendingGains={scannerPendingGains}
-                  lastScanAt={lastScanAt}
-                  scannerError={scannerError}
-                  onStart={handleStartScanner}
-                  onStop={handleStopScanner}
-                  onResetPending={handleResetPendingRound}
-                  onEndRound={handleEndScannerRound}
-                  selectedMap={selectedMap}
-                />
-              ) : null}
-
-              <section className="content-grid">
-                <CapturePanel
-                  formMessage={formMessage}
-                  handleCaptureRound={handleCaptureRound}
-                  handleInventoryChange={handleInventoryChange}
-                  inventoryInputs={inventoryInputs}
-                  isDesktopShell={isDesktopShell}
-                  isOverlayMode={false}
-                  onOpenOverlay={handleOpenOverlay}
-                  projectedRoundGain={projectedRoundGain}
-                  roundGains={roundGains}
-                  selectedMap={selectedMap}
-                  selectedSession={selectedSession}
-                  nextRoundNumber={nextRoundNumber}
-                />
-
-                <div className="stack-column">
-                  <article className="page-panel insight-panel">
-                    <div className="panel-header">
-                      <div>
-                        <h2>Round Gain Trend</h2>
-                        <p className="subtle-text">Last 12 captured rounds.</p>
-                      </div>
-                    </div>
-                    <RoundTrendChart history={selectedSession?.history ?? []} />
-                  </article>
-
-                  <article className="page-panel insight-panel">
-                    <div className="panel-header">
-                      <div>
-                        <h2>Session Inventory</h2>
-                        <p className="subtle-text">{selectedMap.items.length} tracked items on this route.</p>
-                      </div>
-                    </div>
-
-                    <div className="totals-list">
-                      {selectedMap.items.map((item) => {
-                        const total = selectedSession?.totals[item.id] ?? 0;
-                        const progress = getStackProgress(total);
-
-                        return (
-                          <div key={item.id} className="total-row">
-                            <div className="total-copy">
-                              <strong>{item.name}</strong>
-                              <span>{total} items earned this session</span>
-                            </div>
-                            <div className="total-metric">
-                              <span>{progress.fullStacks} stacks</span>
-                              <small>{progress.remainder} / {STACK_SIZE}</small>
-                            </div>
-                            <div className="progress-track">
-                              <div
-                                className="progress-fill"
-                                style={{ width: `${progress.percent}%`, backgroundColor: item.color }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </article>
-                </div>
-              </section>
-
-              <section className="records-grid">
-                <article className="page-panel records-card">
-                  <div className="panel-header">
-                    <div>
-                      <h2>Recent Rounds</h2>
-                      <p className="subtle-text">Latest checkpoints on {selectedMap.name}.</p>
-                    </div>
+                  <p>{routeDetails?.notes ?? map.note}</p>
+                  <div className="landing-route-pills">
+                    {map.items.map((item) => (
+                      <span key={item.id}>{item.name}</span>
+                    ))}
                   </div>
-
-                  {!selectedSession || selectedSession.history.length === 0 ? (
-                    <p className="empty-state">Captured rounds will appear here.</p>
-                  ) : (
-                    <div className="scroll-region">
-                      <div className="records-list">
-                        {selectedSession.history.map((entry) => (
-                          <div key={entry.id} className="record-card">
-                            <div className="record-head">
-                              <div>
-                                <strong>Round {entry.round}</strong>
-                                <span>{formatDate(entry.createdAt)}</span>
-                              </div>
-                              <b>+{getTotalItems(entry.gains)}</b>
-                            </div>
-                            <div className="record-values">
-                              {selectedMap.items.map((item) => (
-                                <span key={item.id}>
-                                  {item.name}: +{entry.gains[item.id] ?? 0}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </article>
-
-                <article className="page-panel records-card">
-                  <div className="panel-header">
-                    <div>
-                      <h2>Finished Sessions</h2>
-                      <p className="subtle-text">Completed run archive for this map.</p>
-                    </div>
-                  </div>
-
-                  {!selectedSession || selectedSession.sessions.length === 0 ? (
-                    <p className="empty-state">Finish a session to archive its totals here.</p>
-                  ) : (
-                    <div className="records-list">
-                      {selectedSession.sessions.map((session) => (
-                        <div key={session.id} className="record-card">
-                          <div className="record-head">
-                            <div>
-                              <strong>{session.rounds} rounds</strong>
-                              <span>{formatDate(session.finishedAt)}</span>
-                            </div>
-                            <b>{getTotalItems(session.totals)} total</b>
-                          </div>
-                          <div className="record-values">
-                            {selectedMap.items.map((item) => (
-                              <span key={item.id}>
-                                {item.name}: {session.totals[item.id] ?? 0}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </article>
-              </section>
-            </>
-          )}
-        </main>
-      </div>
-      {calibrationSession ? (
-        <AutoCaptureCalibrationModal
-          session={calibrationSession}
-          onCancel={() => setCalibrationSession(null)}
-          onRetake={handleRetakeAutoCaptureCalibration}
-          onSelect={handleSelectCalibrationPoint}
-        />
-      ) : null}
-      {showWelcomeGuide ? (
-        <WelcomeGuideModal
-          installerUrl={OVERLAY_INSTALLER_URL}
-          isDesktopShell={isDesktopShell}
-          language={guideLanguage}
-          mapName={selectedMap.name}
-          onClose={handleDismissWelcomeGuide}
-          onInstall={handleInstallOverlay}
-          onLanguageChange={setGuideLanguage}
-          onLaunchOverlay={handleLaunchOverlayApp}
-        />
-      ) : null}
+              );
+            })}
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

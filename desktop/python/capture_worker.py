@@ -153,6 +153,19 @@ def load_config():
 # Screenshot capture
 # ---------------------------------------------------------------------------
 
+def _parse_env_scan_region():
+    """Read FARMTRACKS_SCAN_REGION=x,y,w,h env var set by Electron."""
+    raw = os.environ.get("FARMTRACKS_SCAN_REGION", "").strip()
+    if not raw:
+        return None
+    try:
+        x, y, w, h = map(int, raw.split(","))
+        return {"x": x, "y": y, "width": w, "height": h}
+    except Exception:
+        return None
+
+_ENV_SCAN_REGION = _parse_env_scan_region()
+
 def capture_screenshot(config):
     """
     Capture the screen region defined in config (or full primary monitor).
@@ -163,7 +176,8 @@ def capture_screenshot(config):
     if not HAS_CV2:
         raise RuntimeError("opencv-python is not installed")
 
-    region = config.get("scanRegion")
+    # Env var takes precedence (set by Electron from user-drawn bag area)
+    region = _ENV_SCAN_REGION or config.get("scanRegion")
 
     with mss.mss() as sct:
         if region:

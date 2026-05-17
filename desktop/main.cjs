@@ -333,6 +333,73 @@ function getPythonWorkerPath() {
 }
 
 // ---------------------------------------------------------------------------
+// Scan region – user-drawn bounding box restricting Python scanner to bag area
+// ---------------------------------------------------------------------------
+
+const SCAN_REGION_FILE = () => path.join(app.getPath("userData"), "scan_region.json");
+
+function loadScanRegion() {
+  try {
+    const data = fsSync.readFileSync(SCAN_REGION_FILE(), "utf8");
+    return JSON.parse(data);
+  } catch (_) {
+    return null;
+  }
+}
+
+function saveScanRegionData(region) {
+  fsSync.writeFileSync(SCAN_REGION_FILE(), JSON.stringify(region));
+}
+
+let regionSelectorWindow = null;
+
+function openRegionSelector() {
+  if (regionSelectorWindow) {
+    regionSelectorWindow.focus();
+    return;
+  }
+
+  regionSelectorWindow = new BrowserWindow({
+    fullscreen: true,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  regionSelectorWindow.loadFile(path.join(__dirname, "select-region.html"));
+
+  const cleanup = () => {
+    ipcMain.removeAllListeners("select-region:done");
+    ipcMain.removeAllListeners("select-region:cancel");
+    if (regionSelectorWindow && !regionSelectorWindow.isDestroyed()) {
+      regionSelectorWindow.close();
+    }
+    regionSelectorWindow = null;
+  };
+
+  ipcMain.once("select-region:done", (_event, region) => {
+    saveScanRegionData(region);
+    broadcastToAllWindows("farmtracks:scan-region-updated", region);
+    cleanup();
+    // Restart Python worker so it picks up the new scan region
+    stopPythonWorker();
+    setTimeout(() => startPythonWorker(), 500);
+  });
+
+  ipcMain.once("select-region:cancel", cleanup);
+  regionSelectorWindow.on("closed", () => {
+    ipcMain.removeAllListeners("select-region:done");
+    ipcMain.removeAllListeners("select-region:cancel");
+    regionSelectorWindow = null;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Tesseract OCR – auto-download and silent install on first run
 // ---------------------------------------------------------------------------
 
@@ -469,6 +536,10 @@ function startPythonWorker() {
   const workerEnv = { ...process.env };
   const tesseractExe = getTesseractExePath();
   if (tesseractExe) workerEnv.TESSERACT_CMD = tesseractExe;
+  const scanRegion = loadScanRegion();
+  if (scanRegion) {
+    workerEnv.FARMTRACKS_SCAN_REGION = `${scanRegion.x},${scanRegion.y},${scanRegion.width},${scanRegion.height}`;
+  }
 
   try {
     pythonWorker = spawn(cmd, args, {
@@ -782,6 +853,16 @@ ipcMain.handle("farmtracks:scanner-reset-pending", () => {
 
 ipcMain.handle("farmtracks:scanner-end-round", () => {
   broadcastToAllWindows("farmtracks:scanner-hotkey", { action: "end-round" });
+  return { ok: true };
+});
+
+ipcMain.handle("farmtracks:open-region-selector", () => { openRegionSelector(); return { ok: true }; });
+ipcMain.handle("farmtracks:get-scan-region", () => loadScanRegion());
+ipcMain.handle("farmtracks:clear-scan-region", () => {
+  try { fsSync.unlinkSync(SCAN_REGION_FILE()); } catch (_) {}
+  broadcastToAllWindows("farmtracks:scan-region-updated", null);
+  stopPythonWorker();
+  setTimeout(() => startPythonWorker(), 500);
   return { ok: true };
 });
 
