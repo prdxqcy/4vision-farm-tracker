@@ -1674,6 +1674,10 @@ function App() {
         <div className="site-hero-inner">
           <p className="site-hero-eyebrow">4Vision Farming Tool</p>
           <h1 className="site-hero-title">FarmTracks Overlay</h1>
+          <div className="site-dev-notice" role="note" aria-label="Development status notice">
+            THIS PROJECT IS STILL UNDERGOING DEVELOPMENT, PLEASE BE PATIENT. AUTO SCANNING IS STILL IN DEVELOPMENT.
+            MANUAL INPUT WORKS AS INTENDED.
+          </div>
           <p className="site-hero-sub">
             Real-time item scanner for Narwashi runs. An always-on-top overlay that counts crystals,
             arcanes and speed potions automatically — so you can focus on farming.

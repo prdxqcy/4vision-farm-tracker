@@ -2017,6 +2017,21 @@ button:disabled {
   letter-spacing: 0.04em;
 }
 
+.site-dev-notice {
+  margin: 22px auto 0;
+  max-width: 760px;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 108, 108, 0.42);
+  border-radius: 6px;
+  background: rgba(120, 12, 12, 0.38);
+  color: #ff8d8d;
+  font-size: 0.94rem;
+  line-height: 1.65;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
 .site-hero-sub {
   margin: 22px auto 0;
   max-width: 56ch;
