@@ -332,7 +332,22 @@ function getPythonCommand() {
     return { cmd: getPythonWorkerPath(), args: [] };
   }
   const script = path.join(__dirname, "python", "capture_worker.py");
-  return { cmd: "python", args: [script] };
+  // On Windows, "python" may not be in PATH but "py" (the launcher) usually is.
+  // Try py first, then python, then python3.
+  const candidates = process.platform === "win32"
+    ? ["py", "python", "python3"]
+    : ["python3", "python"];
+  for (const cmd of candidates) {
+    try {
+      const result = require("child_process").spawnSync(cmd, ["--version"], { windowsHide: true, timeout: 3000 });
+      if (result.status === 0) {
+        return { cmd, args: [script] };
+      }
+    } catch (_) {
+      // not found, try next
+    }
+  }
+  return { cmd: candidates[0], args: [script] };
 }
 
 function broadcastToAllWindows(channel, payload) {
