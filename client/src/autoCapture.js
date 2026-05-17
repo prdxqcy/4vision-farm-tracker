@@ -499,27 +499,42 @@ async function getOcrWorker() {
   return ocrWorkerPromise;
 }
 
-async function extractCountFromSlot(screenCanvas, match) {
-  const slotCanvas = createOffscreenCanvas(match.slotSize, match.slotSize);
+function cropPaddedSlotCanvas(screenCanvas, match) {
+  const padding = Math.max(12, Math.round(match.slotSize * 0.6));
+  const startX = clamp(match.slotX - 4, 0, Math.max(0, screenCanvas.width - 1));
+  const startY = clamp(match.slotY, 0, Math.max(0, screenCanvas.height - 1));
+  const endX = clamp(match.slotX + match.slotSize + padding, startX + 1, screenCanvas.width);
+  const endY = clamp(match.slotY + match.slotSize + padding, startY + 1, screenCanvas.height);
+  const width = endX - startX;
+  const height = endY - startY;
+  const slotCanvas = createOffscreenCanvas(width, height);
   const slotContext = slotCanvas.getContext("2d", { willReadFrequently: true });
+
   slotContext.drawImage(
     screenCanvas,
-    match.slotX,
-    match.slotY,
-    match.slotSize,
-    match.slotSize,
+    startX,
+    startY,
+    width,
+    height,
     0,
     0,
-    match.slotSize,
-    match.slotSize
+    width,
+    height
   );
+
+  return slotCanvas;
+}
+
+async function extractCountFromSlot(screenCanvas, match) {
+  const slotCanvas = cropPaddedSlotCanvas(screenCanvas, match);
 
   const worker = await getOcrWorker();
   const variants = [
-    { cropTop: 0.42, cropHeight: 0.5, scale: 6, threshold: 78, minRed: 58, minGreen: 46 },
-    { cropTop: 0.42, cropHeight: 0.5, scale: 6, threshold: 92, minRed: 68, minGreen: 52 },
-    { cropTop: 0.46, cropHeight: 0.46, scale: 7, threshold: 82, minRed: 58, minGreen: 46 },
-    { cropTop: 0.36, cropHeight: 0.58, scale: 7, threshold: 105, minRed: 70, minGreen: 58 }
+    { cropTop: 0.4, cropHeight: 0.54, scale: 7, threshold: 76, minRed: 54, minGreen: 42 },
+    { cropTop: 0.46, cropHeight: 0.46, scale: 7, threshold: 88, minRed: 62, minGreen: 48 },
+    { cropTop: 0.52, cropHeight: 0.34, scale: 8, threshold: 74, minRed: 52, minGreen: 40 },
+    { cropTop: 0.5, cropHeight: 0.38, scale: 9, threshold: 92, minRed: 66, minGreen: 50 },
+    { cropTop: 0.36, cropHeight: 0.58, scale: 8, threshold: 102, minRed: 68, minGreen: 54 }
   ];
   const candidates = [];
 
