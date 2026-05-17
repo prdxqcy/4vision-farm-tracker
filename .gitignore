@@ -5,3 +5,8 @@ dist/
 client/dist/
 release/
 client/public/downloads/*.exe
+desktop/python/build/
+desktop/python/dist/
+__pycache__/
+*.pyc
+.claude/
