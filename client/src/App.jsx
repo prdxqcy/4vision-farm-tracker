@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   NARWASHI_AUTO_CAPTURE_ITEMS,
   captureDesktopScreenshot,
@@ -700,7 +700,7 @@ function ScannerStatusPanel({
           <button type="button" className="ghost-button" onClick={onResetPending} disabled={!isRunning}>
             Reset baseline (F8)
           </button>
-          <button type="button" className="primary-button" onClick={onEndRound} disabled={!hasGains}>
+          <button type="button" className="primary-button" onClick={onEndRound} disabled={!latestSnapshot}>
             End round (F9)
           </button>
         </div>
@@ -808,6 +808,10 @@ function App() {
   const [scannerRunning, setScannerRunning] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const [lastScanAt, setLastScanAt] = useState(null);
+
+  // Refs so hotkey handlers always see the latest values despite the [] closure
+  const scannerLatestSnapshotRef = useRef(null);
+  const handleEndScannerRoundRef = useRef(null);
 
   const selectedMap = useMemo(
     () => MAPS.find((map) => map.id === selectedMapId) ?? MAPS[0],
@@ -926,6 +930,10 @@ function App() {
   }, [guideLanguage]);
 
   useEffect(() => {
+    scannerLatestSnapshotRef.current = scannerLatestSnapshot;
+  }, [scannerLatestSnapshot]);
+
+  useEffect(() => {
     if (!isDesktopShellAvailable()) return;
 
     const unsubUpdate = window.farmtracksDesktop.onScannerUpdate((payload) => {
@@ -945,10 +953,11 @@ function App() {
 
     const unsubHotkey = window.farmtracksDesktop.onScannerHotkey((payload) => {
       if (payload.action === "reset-pending") {
-        setScannerPendingBaseline(scannerLatestSnapshot);
+        // Use functional updater so we read latest snapshot via ref, not stale closure
+        setScannerPendingBaseline(scannerLatestSnapshotRef.current);
       }
       if (payload.action === "end-round") {
-        handleEndScannerRound();
+        handleEndScannerRoundRef.current?.();
       }
     });
 
@@ -956,7 +965,6 @@ function App() {
       unsubUpdate();
       unsubHotkey();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const nextRoundNumber = (selectedSession?.rounds ?? 0) + 1;
@@ -1234,7 +1242,8 @@ function App() {
   }
 
   function handleEndScannerRound() {
-    if (!scannerLatestSnapshot || !selectedPlayer) return;
+    const latest = scannerLatestSnapshotRef.current;
+    if (!latest || !selectedPlayer) return;
 
     const hasGains = scannerPendingGains && Object.values(scannerPendingGains).some((v) => v > 0);
     if (!hasGains) {
@@ -1242,11 +1251,14 @@ function App() {
       return;
     }
 
-    const captured = applySnapshot(scannerLatestSnapshot, "Python scanner");
+    const captured = applySnapshot(latest, "Python scanner");
     if (captured) {
-      setScannerPendingBaseline(scannerLatestSnapshot);
+      setScannerPendingBaseline(latest);
     }
   }
+
+  // Keep ref current on every render so the hotkey closure always calls the latest version
+  handleEndScannerRoundRef.current = handleEndScannerRound;
 
   if (isOverlayMode) {
     return (
