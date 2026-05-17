@@ -298,70 +298,93 @@ def find_template_matches(screenshot, template, max_matches, threshold=MATCH_THR
 def read_stack_count(screenshot, match):
     """
     OCR the numeric stack count from the inventory slot.
-    Stack numbers appear in the bottom-right corner of the slot icon.
+    Stack counts appear as small white/yellow text at the bottom of the icon.
     Returns an integer >= 1, or 1 if OCR fails.
     """
-    x = match["x"]
-    y = match["y"]
-    w = match["w"]
-    h = match["h"]
+    x, y, w, h = match["x"], match["y"], match["w"], match["h"]
 
-    # Capture bottom half of slot + generous padding below/right so the
-    # number is always included even if it overflows the template bounds.
-    pad_x = max(12, w // 3)
-    pad_y = max(12, h // 3)
-    roi_x1 = max(0, x)                                        # full width
-    roi_y1 = max(0, y + h // 2)                               # bottom half
-    roi_x2 = min(screenshot.shape[1], x + w + pad_x)
-    roi_y2 = min(screenshot.shape[0], y + h + pad_y)
+    # Capture the FULL icon area + 50% padding on all sides so the count
+    # number is never cropped regardless of where the game renders it.
+    pad = max(h // 2, 20)
+    roi_x1 = max(0, x - 4)
+    roi_y1 = max(0, y)
+    roi_x2 = min(screenshot.shape[1], x + w + pad)
+    roi_y2 = min(screenshot.shape[0], y + h + pad)
     roi = screenshot[roi_y1:roi_y2, roi_x1:roi_x2]
 
     if roi.size == 0:
         return 1
 
-    if HAS_TESSERACT:
-        try:
-            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-            # Always upscale to at least 64px tall — Tesseract struggles on tiny images
-            target_h = max(64, gray.shape[0])
-            scale_up = target_h / gray.shape[0]
-            gray = cv2.resize(gray, None, fx=scale_up, fy=scale_up, interpolation=cv2.INTER_CUBIC)
+    if not HAS_TESSERACT:
+        if HAS_EASYOCR:
+            try:
+                if not hasattr(read_stack_count, "_reader"):
+                    read_stack_count._reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+                results = read_stack_count._reader.readtext(roi, detail=0, allowlist="0123456789")
+                for r in results:
+                    digits = "".join(ch for ch in r if ch.isdigit())
+                    if digits and int(digits) > 0:
+                        return min(999, int(digits))
+            except Exception:
+                pass
+        return 1
 
-            digits_found = None
-            # Try multiple preprocessing strategies
-            for invert in (False, True):
-                src = cv2.bitwise_not(gray) if invert else gray
-                for thresh_method in (cv2.THRESH_BINARY + cv2.THRESH_OTSU,):
-                    _, thresh = cv2.threshold(src, 0, 255, thresh_method)
-                    for psm in ("7", "8", "13"):
-                        cfg = f"--psm {psm} -c tessedit_char_whitelist=0123456789"
-                        text = pytesseract.image_to_string(thresh, config=cfg).strip()
+    try:
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        # Also extract a max-channel image — picks up white AND yellow text equally
+        ch_max = np.max(roi, axis=2)
+
+        # Upscale 4x — stack count text is tiny (8-12px), Tesseract needs size
+        gray4 = cv2.resize(gray, None, fx=4, fy=4, interpolation=cv2.INTER_LANCZOS4)
+        ch4 = cv2.resize(ch_max, None, fx=4, fy=4, interpolation=cv2.INTER_LANCZOS4)
+
+        all_vals = []
+
+        def _ocr(img):
+            for psm in ("8", "7", "6"):
+                for wl in (True, False):
+                    cfg = f"--psm {psm}"
+                    if wl:
+                        cfg += " -c tessedit_char_whitelist=0123456789"
+                    try:
+                        text = pytesseract.image_to_string(img, config=cfg).strip()
                         digits = "".join(ch for ch in text if ch.isdigit())
                         if digits:
-                            digits_found = digits
-                            break
-                    if digits_found:
-                        break
-                if digits_found:
-                    break
-            if digits_found:
-                return min(999, int(digits_found))
-        except Exception:
-            pass
+                            all_vals.append(int(digits[:3]))
+                    except Exception:
+                        pass
 
-    if HAS_EASYOCR:
-        try:
-            if not hasattr(read_stack_count, "_reader"):
-                read_stack_count._reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-            results = read_stack_count._reader.readtext(roi, detail=0, allowlist="0123456789")
-            for r in results:
-                digits = "".join(ch for ch in r if ch.isdigit())
-                if digits:
-                    return min(999, int(digits))
-        except Exception:
-            pass
+        # Strategy A: bright-pixel mask (best for white/yellow text on dark bg)
+        for src in (gray4, ch4):
+            _, bright = cv2.threshold(src, 200, 255, cv2.THRESH_BINARY)
+            kernel = np.ones((2, 2), np.uint8)
+            bright = cv2.dilate(bright, kernel, iterations=1)
+            _ocr(cv2.bitwise_not(bright))  # invert: dark text on white
 
-    return 1  # fallback: assume single item if OCR unavailable
+        # Strategy B: OTSU on both polarities
+        for src in (gray4, ch4):
+            _, ot = cv2.threshold(src, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            _ocr(ot)
+            _ocr(cv2.bitwise_not(ot))
+
+        # Strategy C: raw grayscale (LSTM engine can handle it)
+        _ocr(gray4)
+        _ocr(ch4)
+
+        if all_vals:
+            # Prefer values > 1 (real stack counts) over 1 (likely OCR noise)
+            real = [v for v in all_vals if v > 1]
+            if real:
+                from collections import Counter
+                winner = Counter(real).most_common(1)[0][0]
+                print(f"OCR stack: {winner} (candidates={all_vals})", file=sys.stderr, flush=True)
+                return min(999, winner)
+            print(f"OCR returned only 1s (candidates={all_vals})", file=sys.stderr, flush=True)
+
+    except Exception as e:
+        print(f"OCR error: {e}", file=sys.stderr, flush=True)
+
+    return 1
 
 # ---------------------------------------------------------------------------
 # Stability filter – median over last STABILITY_WINDOW scans per item.
