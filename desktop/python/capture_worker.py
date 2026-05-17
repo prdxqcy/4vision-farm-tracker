@@ -47,17 +47,19 @@ except ImportError:
 
 try:
     import pytesseract
-    # Auto-locate Tesseract on Windows if not already on PATH
-    if sys.platform == "win32":
+    # Prefer the path injected by Electron via env var (auto-installed Tesseract in userData)
+    _tess_env = os.environ.get("TESSERACT_CMD", "")
+    if _tess_env and os.path.isfile(_tess_env):
+        pytesseract.pytesseract.tesseract_cmd = _tess_env
+    elif sys.platform == "win32":
         import shutil
         if not shutil.which("tesseract"):
-            _candidates = [
+            for _p in [
                 r"C:\Program Files\Tesseract-OCR\tesseract.exe",
                 r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-            ]
-            for _path in _candidates:
-                if os.path.isfile(_path):
-                    pytesseract.pytesseract.tesseract_cmd = _path
+            ]:
+                if os.path.isfile(_p):
+                    pytesseract.pytesseract.tesseract_cmd = _p
                     break
     HAS_TESSERACT = True
 except ImportError:

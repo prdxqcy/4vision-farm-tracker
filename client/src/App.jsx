@@ -786,6 +786,7 @@ function OverlayScannerPanel({
   nextRoundNumber,
   formMessage,
   resetConfirmMsg,
+  ocrSetupMsg,
   inventoryInputs,
   onInventoryChange,
   onCaptureRound,
@@ -819,6 +820,10 @@ function OverlayScannerPanel({
 
         {scannerError ? (
           <p className="feedback-text overlay-scanner-error">{scannerError}</p>
+        ) : null}
+
+        {ocrSetupMsg ? (
+          <p className="overlay-ocr-setup-msg">{ocrSetupMsg}</p>
         ) : null}
 
         <div className="overlay-item-grid">
@@ -1016,6 +1021,7 @@ function App() {
   const [scannerError, setScannerError] = useState("");
   const [lastScanAt, setLastScanAt] = useState(null);
   const [resetConfirmMsg, setResetConfirmMsg] = useState("");
+  const [ocrSetupMsg, setOcrSetupMsg] = useState("");
 
   // Refs so hotkey handlers always see the latest values despite the [] closure
   const scannerLatestSnapshotRef = useRef(null);
@@ -1181,10 +1187,21 @@ function App() {
       setHotkeys(hk);
     });
 
+    const unsubOcr = window.farmtracksDesktop.onOcrSetup?.((payload) => {
+      if (payload.status === "done") {
+        setOcrSetupMsg("");
+      } else if (payload.status === "downloading" || payload.status === "installing") {
+        setOcrSetupMsg(payload.message ?? "Setting up OCR…");
+      } else {
+        setOcrSetupMsg(""); // error: silent, scanner just shows 1s
+      }
+    }) ?? (() => {});
+
     return () => {
       unsubUpdate();
       unsubHotkey();
       unsubHotkeys();
+      unsubOcr();
     };
   }, []);
 
@@ -1556,6 +1573,7 @@ function App() {
             nextRoundNumber={nextRoundNumber}
             formMessage={formMessage}
             resetConfirmMsg={resetConfirmMsg}
+            ocrSetupMsg={ocrSetupMsg}
             inventoryInputs={inventoryInputs}
             onInventoryChange={handleInventoryChange}
             onCaptureRound={() => applySnapshot(normalizeRoundInput(selectedMap, inventoryInputs), "manual input")}

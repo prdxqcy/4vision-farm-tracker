@@ -1648,6 +1648,20 @@ button:disabled {
   background: rgba(0,0,0,0.18);
 }
 
+.overlay-ocr-setup-msg {
+  font-size: 10px;
+  color: var(--gold-faint);
+  margin: 0;
+  text-align: center;
+  opacity: 0.75;
+  animation: ocr-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ocr-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
 .overlay-reset-row {
   display: flex;
   align-items: center;

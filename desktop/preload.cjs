@@ -36,4 +36,11 @@ contextBridge.exposeInMainWorld("farmtracksDesktop", {
     ipcRenderer.on("farmtracks:hotkeys-updated", handler);
     return () => ipcRenderer.removeListener("farmtracks:hotkeys-updated", handler);
   },
+
+  // OCR auto-install progress
+  onOcrSetup: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("farmtracks:ocr-setup", handler);
+    return () => ipcRenderer.removeListener("farmtracks:ocr-setup", handler);
+  },
 });

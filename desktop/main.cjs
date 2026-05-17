@@ -332,6 +332,105 @@ function getPythonWorkerPath() {
   return null; // signals to use python command
 }
 
+// ---------------------------------------------------------------------------
+// Tesseract OCR – auto-download and silent install on first run
+// ---------------------------------------------------------------------------
+
+const TESSERACT_SETUP_URL =
+  "https://github.com/UB-Mannheim/tesseract/releases/download/v5.5.0.20241111/tesseract-ocr-w64-setup-5.5.0.20241111.exe";
+
+function getTesseractExePath() {
+  if (process.platform !== "win32") return null;
+  const candidates = [
+    path.join(app.getPath("userData"), "tesseract", "tesseract.exe"),
+    "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+    "C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe",
+  ];
+  for (const c of candidates) {
+    if (fsSync.existsSync(c)) return c;
+  }
+  return null;
+}
+
+function downloadFile(url, dest) {
+  return new Promise((resolve, reject) => {
+    const https = require("https");
+    const http = require("http");
+    const out = fsSync.createWriteStream(dest);
+    out.on("error", reject);
+
+    function fetch(u) {
+      const mod = u.startsWith("https") ? https : http;
+      mod.get(u, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          fetch(res.headers.location);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+        res.pipe(out);
+        out.on("finish", () => out.close(resolve));
+      }).on("error", (err) => {
+        try { fsSync.unlinkSync(dest); } catch (_) {}
+        reject(err);
+      });
+    }
+
+    fetch(url);
+  });
+}
+
+async function ensureTesseract() {
+  if (process.platform !== "win32") return;
+  if (getTesseractExePath()) return; // already installed
+
+  const installDir = path.join(app.getPath("userData"), "tesseract");
+  const installerPath = path.join(os.tmpdir(), "farmtracks-tesseract-setup.exe");
+
+  broadcastToAllWindows("farmtracks:ocr-setup", {
+    status: "downloading",
+    message: "Setting up OCR engine for the first time (~22 MB)…",
+  });
+
+  try {
+    await downloadFile(TESSERACT_SETUP_URL, installerPath);
+
+    broadcastToAllWindows("farmtracks:ocr-setup", {
+      status: "installing",
+      message: "Installing OCR engine…",
+    });
+
+    const { spawnSync } = require("child_process");
+    spawnSync(
+      installerPath,
+      ["/VERYSILENT", "/NORESTART", `/DIR=${installDir}`],
+      { timeout: 180000, windowsHide: true }
+    );
+
+    try { fsSync.unlinkSync(installerPath); } catch (_) {}
+
+    if (getTesseractExePath()) {
+      broadcastToAllWindows("farmtracks:ocr-setup", { status: "done", message: "OCR ready" });
+      // Restart Python worker so it picks up the new TESSERACT_CMD env var
+      stopPythonWorker();
+      startPythonWorker();
+    } else {
+      broadcastToAllWindows("farmtracks:ocr-setup", {
+        status: "error",
+        message: "OCR install failed — stack counts will show as 1",
+      });
+    }
+  } catch (err) {
+    try { fsSync.unlinkSync(installerPath); } catch (_) {}
+    broadcastToAllWindows("farmtracks:ocr-setup", {
+      status: "error",
+      message: "OCR download failed — stack counts will show as 1",
+    });
+  }
+}
+
 function getPythonCommand() {
   if (app.isPackaged) {
     return { cmd: getPythonWorkerPath(), args: [] };
@@ -367,11 +466,15 @@ function startPythonWorker() {
   if (pythonWorker) return; // already running
 
   const { cmd, args } = getPythonCommand();
+  const workerEnv = { ...process.env };
+  const tesseractExe = getTesseractExePath();
+  if (tesseractExe) workerEnv.TESSERACT_CMD = tesseractExe;
 
   try {
     pythonWorker = spawn(cmd, args, {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      env: workerEnv,
     });
   } catch (err) {
     broadcastToAllWindows("farmtracks:scanner-update", {
@@ -765,6 +868,10 @@ app.whenReady().then(async () => {
 
   // Auto-start the Python scanner
   startPythonWorker();
+
+  // Download and install Tesseract OCR silently in the background if not present.
+  // When done it restarts the Python worker so TESSERACT_CMD is available.
+  ensureTesseract().catch(() => {});
 });
 
 app.on("window-all-closed", async () => {
