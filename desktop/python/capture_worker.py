@@ -107,7 +107,8 @@ ITEM_CONFIGS = [
 # ---------------------------------------------------------------------------
 # Template matching thresholds (tune after adding real templates)
 # ---------------------------------------------------------------------------
-MATCH_THRESHOLD = 0.72   # cv2.TM_CCOEFF_NORMED confidence (0–1, higher = stricter)
+MATCH_THRESHOLD = 0.65   # cv2.TM_CCOEFF_NORMED confidence (0–1, higher = stricter)
+MAX_SCREENSHOT_WIDTH = 1920  # downsample wide screenshots to cap memory usage
 DEDUP_DISTANCE_PX = 20   # pixels; nearby duplicates within this radius are merged
 SCALES = [0.88, 0.94, 1.0, 1.06, 1.12]  # multi-scale scan
 
@@ -157,10 +158,17 @@ def capture_screenshot(config):
 
         raw = sct.grab(monitor)
 
-    # mss returns BGRA; convert to BGR for OpenCV
-    img = np.frombuffer(raw.raw, dtype=np.uint8)
-    img = img.reshape((raw.height, raw.width, 4))
-    return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    # mss returns BGRA; convert to grayscale immediately to minimize memory
+    img = np.frombuffer(raw.raw, dtype=np.uint8).reshape((raw.height, raw.width, 4))
+    bgr = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
+    # Downsample very wide screenshots to cap peak memory during matchTemplate
+    h, w = bgr.shape[:2]
+    if w > MAX_SCREENSHOT_WIDTH:
+        scale = MAX_SCREENSHOT_WIDTH / w
+        bgr = cv2.resize(bgr, (MAX_SCREENSHOT_WIDTH, int(h * scale)), interpolation=cv2.INTER_AREA)
+
+    return bgr
 
 # ---------------------------------------------------------------------------
 # Template loading
@@ -264,13 +272,12 @@ def read_stack_count(screenshot, match):
     w = match["w"]
     h = match["h"]
 
-    # Crop a slightly expanded region to capture the stack number overlay
-    margin = 4
-    x1 = max(0, x - margin)
-    y1 = max(0, y - margin)
-    x2 = min(screenshot.shape[1], x + w + margin)
-    y2 = min(screenshot.shape[0], y + h + margin + 12)  # a bit below for the count
-    roi = screenshot[y1:y2, x1:x2]
+    # Stack counts appear in the bottom-right corner of the inventory slot icon
+    roi_x1 = max(0, x + w // 2)
+    roi_y1 = max(0, y + h // 2)
+    roi_x2 = min(screenshot.shape[1], x + w + 6)
+    roi_y2 = min(screenshot.shape[0], y + h + 6)
+    roi = screenshot[roi_y1:roi_y2, roi_x1:roi_x2]
 
     if roi.size == 0:
         return 1
@@ -278,12 +285,18 @@ def read_stack_count(screenshot, match):
     if HAS_TESSERACT:
         try:
             gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            config_str = "--psm 8 -c tessedit_char_whitelist=0123456789"
-            text = pytesseract.image_to_string(thresh, config=config_str).strip()
-            digits = "".join(ch for ch in text if ch.isdigit())
-            if digits:
-                return min(999, int(digits))
+            # Scale up tiny ROI for better OCR accuracy
+            if gray.shape[0] < 24:
+                gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+            # Try both polarities — game UIs use white-on-dark or dark-on-light
+            for invert in (False, True):
+                src = cv2.bitwise_not(gray) if invert else gray
+                _, thresh = cv2.threshold(src, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                config_str = "--psm 8 -c tessedit_char_whitelist=0123456789"
+                text = pytesseract.image_to_string(thresh, config=config_str).strip()
+                digits = "".join(ch for ch in text if ch.isdigit())
+                if digits:
+                    return min(999, int(digits))
         except Exception:
             pass
 

@@ -1,7 +1,7 @@
 {
   "name": "farmtracks",
   "private": true,
-  "version": "1.0.23",
+  "version": "1.0.24",
   "main": "desktop/main.cjs",
   "workspaces": [
     "client",
