@@ -107,7 +107,7 @@ ITEM_CONFIGS = [
 # ---------------------------------------------------------------------------
 # Template matching thresholds (tune after adding real templates)
 # ---------------------------------------------------------------------------
-MATCH_THRESHOLD = 0.60   # cv2.TM_CCOEFF_NORMED confidence (0–1, higher = stricter)
+MATCH_THRESHOLD = 0.72   # cv2.TM_CCOEFF_NORMED confidence (0–1, higher = stricter)
 DEDUP_DISTANCE_PX = 20   # pixels; nearby duplicates within this radius are merged
 SCALES = [0.88, 0.94, 1.0, 1.06, 1.12]  # multi-scale scan
 

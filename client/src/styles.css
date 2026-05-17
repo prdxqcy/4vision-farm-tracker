@@ -1648,6 +1648,48 @@ button:disabled {
   background: rgba(0,0,0,0.18);
 }
 
+.overlay-reset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.overlay-zero-btn {
+  background: none;
+  border: none;
+  color: var(--gold-faint);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.overlay-zero-btn:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.overlay-zero-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.overlay-reset-confirm {
+  font-size: 10px;
+  color: #6ee7b7;
+  animation: confirm-fade 2s forwards;
+}
+
+@keyframes confirm-fade {
+  0% { opacity: 1; }
+  60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 .overlay-form-message {
   font-size: 11px;
   color: var(--gold-faint);

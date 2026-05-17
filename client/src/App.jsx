@@ -779,11 +779,13 @@ function OverlayScannerPanel({
   onStart,
   onStop,
   onResetPending,
+  onResetToZero,
   onEndRound,
   selectedMap,
   selectedSession,
   nextRoundNumber,
   formMessage,
+  resetConfirmMsg,
   inventoryInputs,
   onInventoryChange,
   onCaptureRound,
@@ -862,6 +864,19 @@ function OverlayScannerPanel({
           >
             End Round <kbd>{hk.endRound}</kbd>
           </button>
+        </div>
+
+        <div className="overlay-reset-row">
+          <button
+            type="button"
+            className="overlay-zero-btn"
+            onClick={onResetToZero}
+            disabled={!isRunning}
+            title="Set baseline to zero — gains will count up from 0"
+          >
+            Count from zero
+          </button>
+          {resetConfirmMsg ? <span className="overlay-reset-confirm">{resetConfirmMsg}</span> : null}
         </div>
 
         {formMessage ? <p className="overlay-form-message">{formMessage}</p> : null}
@@ -1000,6 +1015,7 @@ function App() {
   const [scannerRunning, setScannerRunning] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const [lastScanAt, setLastScanAt] = useState(null);
+  const [resetConfirmMsg, setResetConfirmMsg] = useState("");
 
   // Refs so hotkey handlers always see the latest values despite the [] closure
   const scannerLatestSnapshotRef = useRef(null);
@@ -1444,6 +1460,14 @@ function App() {
 
   function handleResetPendingRound() {
     setScannerPendingBaseline(scannerLatestSnapshotRef.current);
+    setResetConfirmMsg("Baseline reset ✓");
+    setTimeout(() => setResetConfirmMsg(""), 2000);
+  }
+
+  function handleResetToZero() {
+    setScannerPendingBaseline({ crystals: 0, arcanes: 0, "speed-potions": 0 });
+    setResetConfirmMsg("Counting from zero ✓");
+    setTimeout(() => setResetConfirmMsg(""), 2000);
   }
 
   function handleEndScannerRound() {
@@ -1525,11 +1549,13 @@ function App() {
             onStart={handleStartScanner}
             onStop={handleStopScanner}
             onResetPending={handleResetPendingRound}
+            onResetToZero={handleResetToZero}
             onEndRound={handleEndScannerRound}
             selectedMap={selectedMap}
             selectedSession={selectedSession}
             nextRoundNumber={nextRoundNumber}
             formMessage={formMessage}
+            resetConfirmMsg={resetConfirmMsg}
             inventoryInputs={inventoryInputs}
             onInventoryChange={handleInventoryChange}
             onCaptureRound={() => applySnapshot(normalizeRoundInput(selectedMap, inventoryInputs), "manual input")}
