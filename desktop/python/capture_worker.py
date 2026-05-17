@@ -47,6 +47,18 @@ except ImportError:
 
 try:
     import pytesseract
+    # Auto-locate Tesseract on Windows if not already on PATH
+    if sys.platform == "win32":
+        import shutil
+        if not shutil.which("tesseract"):
+            _candidates = [
+                r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            ]
+            for _path in _candidates:
+                if os.path.isfile(_path):
+                    pytesseract.pytesseract.tesseract_cmd = _path
+                    break
     HAS_TESSERACT = True
 except ImportError:
     HAS_TESSERACT = False
@@ -87,6 +99,7 @@ ITEM_CONFIGS = [
         "count_mode": "instances",
         "max_matches": 10,
         "template_file": "crystals.png",
+        "threshold": CRYSTAL_THRESHOLD,  # stricter to avoid false positives in busy bags
     },
     {
         "id": "arcanes",
@@ -94,6 +107,7 @@ ITEM_CONFIGS = [
         "count_mode": "best-stack",
         "max_matches": 3,
         "template_file": "arcane.png",
+        "threshold": MATCH_THRESHOLD,
     },
     {
         "id": "speed-potions",
@@ -101,14 +115,16 @@ ITEM_CONFIGS = [
         "count_mode": "best-stack",
         "max_matches": 3,
         "template_file": "speedpotions.png",
+        "threshold": MATCH_THRESHOLD,
     },
 ]
 
 # ---------------------------------------------------------------------------
 # Template matching thresholds (tune after adding real templates)
 # ---------------------------------------------------------------------------
-MATCH_THRESHOLD = 0.65   # cv2.TM_CCOEFF_NORMED confidence (0–1, higher = stricter)
-MAX_SCREENSHOT_WIDTH = 1920  # downsample wide screenshots to cap memory usage
+MATCH_THRESHOLD = 0.65        # cv2.TM_CCOEFF_NORMED confidence (0–1, higher = stricter)
+CRYSTAL_THRESHOLD = 0.75      # crystals get a stricter threshold to cut false positives
+MAX_SCREENSHOT_WIDTH = 1920   # downsample wide screenshots to cap memory usage
 DEDUP_DISTANCE_PX = 20   # pixels; nearby duplicates within this radius are merged
 SCALES = [0.88, 0.94, 1.0, 1.06, 1.12]  # multi-scale scan
 
@@ -332,6 +348,7 @@ def scan_inventory(config):
         matches = find_template_matches(
             screenshot, template,
             max_matches=item_cfg["max_matches"],
+            threshold=item_cfg.get("threshold", MATCH_THRESHOLD),
         )
 
         if item_cfg["count_mode"] == "instances":
