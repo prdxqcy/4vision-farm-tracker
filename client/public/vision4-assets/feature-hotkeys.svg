@@ -1,0 +1,32 @@
+<svg width="960" height="560" viewBox="0 0 960 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="114" y1="48" x2="838" y2="510" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#122845"/>
+      <stop offset="1" stop-color="#070B12"/>
+    </linearGradient>
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#1C2432"/>
+      <stop offset="1" stop-color="#0B1017"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="560" fill="url(#bg)"/>
+  <circle cx="217" cy="100" r="124" fill="#2A5D9A" fill-opacity="0.18"/>
+  <circle cx="797" cy="472" r="165" fill="#173C68" fill-opacity="0.18"/>
+  <text x="224" y="134" fill="#F6E7C6" font-size="28" font-family="Georgia, serif" font-weight="700">Rebind and control everything fast</text>
+  <rect x="194" y="179" width="572" height="205" rx="26" fill="#0C1320" stroke="#E7CC92" stroke-opacity="0.2"/>
+  <g>
+    <rect x="246" y="229" width="136" height="108" rx="18" fill="url(#key)" stroke="#E7CC92" stroke-opacity="0.18"/>
+    <rect x="413" y="229" width="136" height="108" rx="18" fill="url(#key)" stroke="#E7CC92" stroke-opacity="0.18"/>
+    <rect x="580" y="229" width="136" height="108" rx="18" fill="url(#key)" stroke="#E7CC92" stroke-opacity="0.18"/>
+    <text x="292" y="274" fill="#F0D8A7" font-size="24" font-family="Arial, sans-serif" font-weight="700">F7</text>
+    <text x="443" y="274" fill="#F0D8A7" font-size="24" font-family="Arial, sans-serif" font-weight="700">F8</text>
+    <text x="610" y="274" fill="#F0D8A7" font-size="24" font-family="Arial, sans-serif" font-weight="700">F9</text>
+    <text x="275" y="311" fill="#87B8FF" font-size="18" font-family="Arial, sans-serif">Toggle UI</text>
+    <text x="444" y="311" fill="#87B8FF" font-size="18" font-family="Arial, sans-serif">Reset Base</text>
+    <text x="606" y="311" fill="#87B8FF" font-size="18" font-family="Arial, sans-serif">Save Round</text>
+  </g>
+  <path d="M280 394C346 428 408 438 475 438C541 438 618 424 677 394" stroke="#2F7CFF" stroke-width="8" stroke-linecap="round" stroke-opacity="0.65"/>
+  <circle cx="282" cy="394" r="10" fill="#F0D8A7"/>
+  <circle cx="475" cy="438" r="10" fill="#F0D8A7"/>
+  <circle cx="677" cy="394" r="10" fill="#F0D8A7"/>
+</svg>

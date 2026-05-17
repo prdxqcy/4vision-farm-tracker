@@ -1661,7 +1661,6 @@ function App() {
       <nav className="site-nav">
         <a className="site-nav-brand" href="https://vision4s.com/" target="_blank" rel="noreferrer">
           <img src="/vision4-assets/vision4-logo.png" alt="4Vision" />
-          <span>FarmTracks</span>
         </a>
         <div className="site-nav-links">
           <a href="#features">Features</a>
@@ -1669,10 +1668,6 @@ function App() {
           <a href="#download">Download</a>
           <a href="https://vision4s.com/" target="_blank" rel="noreferrer">4Vision</a>
         </div>
-        <div className="site-nav-spacer" />
-        <a className="site-nav-cta" href={OVERLAY_INSTALLER_URL} target="_blank" rel="noreferrer" onClick={handleInstallOverlay}>
-          Download
-        </a>
       </nav>
 
       <section className="site-hero">
@@ -1711,7 +1706,9 @@ function App() {
               No clicking, no manual input — just keep farming and the overlay keeps up.
             </p>
           </div>
-          <div className="site-feature-visual" />
+          <div className="site-feature-visual">
+            <img src="/vision4-assets/feature-auto-scanner.svg" alt="Auto-scanner overlay illustration" />
+          </div>
         </div>
 
         <div className="site-feature site-feature-flip">
@@ -1722,7 +1719,9 @@ function App() {
               no false reads from the rest of the screen.
             </p>
           </div>
-          <div className="site-feature-visual" />
+          <div className="site-feature-visual">
+            <img src="/vision4-assets/feature-bag-area.svg" alt="Bag area selection illustration" />
+          </div>
         </div>
 
         <div className="site-feature">
@@ -1733,7 +1732,9 @@ function App() {
               All three are rebindable from inside the overlay.
             </p>
           </div>
-          <div className="site-feature-visual" />
+          <div className="site-feature-visual">
+            <img src="/vision4-assets/feature-hotkeys.svg" alt="Hotkey controls illustration" />
+          </div>
         </div>
 
         <div className="site-feature site-feature-flip">
@@ -1744,7 +1745,9 @@ function App() {
               and across your whole farming session without leaving the game.
             </p>
           </div>
-          <div className="site-feature-visual" />
+          <div className="site-feature-visual">
+            <img src="/vision4-assets/feature-round-tracking.svg" alt="Round tracking chart illustration" />
+          </div>
         </div>
       </div>
 

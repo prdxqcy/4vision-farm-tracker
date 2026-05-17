@@ -1,0 +1,43 @@
+<svg width="960" height="560" viewBox="0 0 960 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="104" y1="47" x2="826" y2="516" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#112846"/>
+      <stop offset="1" stop-color="#070B12"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="204" y1="124" x2="740" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D1626"/>
+      <stop offset="1" stop-color="#0A0E16"/>
+    </linearGradient>
+    <filter id="shadow" x="116" y="72" width="727" height="431" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000000" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <rect width="960" height="560" fill="url(#bg)"/>
+  <circle cx="848" cy="81" r="132" fill="#255EA3" fill-opacity="0.18"/>
+  <circle cx="126" cy="453" r="146" fill="#1A4679" fill-opacity="0.18"/>
+  <g filter="url(#shadow)">
+    <rect x="164" y="112" width="631" height="351" rx="24" fill="url(#screen)" stroke="#E7CC92" stroke-opacity="0.24"/>
+  </g>
+  <rect x="204" y="152" width="551" height="271" rx="18" fill="#0B1220"/>
+  <g opacity="0.32">
+    <rect x="236" y="184" width="110" height="110" rx="14" fill="#12304F"/>
+    <rect x="364" y="184" width="110" height="110" rx="14" fill="#12304F"/>
+    <rect x="492" y="184" width="110" height="110" rx="14" fill="#12304F"/>
+    <rect x="620" y="184" width="103" height="110" rx="14" fill="#12304F"/>
+    <rect x="236" y="312" width="110" height="79" rx="14" fill="#12304F"/>
+    <rect x="364" y="312" width="110" height="79" rx="14" fill="#12304F"/>
+    <rect x="492" y="312" width="110" height="79" rx="14" fill="#12304F"/>
+    <rect x="620" y="312" width="103" height="79" rx="14" fill="#12304F"/>
+  </g>
+  <rect x="352" y="170" width="254" height="202" rx="18" fill="#1E7AF5" fill-opacity="0.12" stroke="#69B4FF" stroke-width="4" stroke-dasharray="12 10"/>
+  <circle cx="352" cy="170" r="10" fill="#F5DCAB"/>
+  <circle cx="606" cy="170" r="10" fill="#F5DCAB"/>
+  <circle cx="352" cy="372" r="10" fill="#F5DCAB"/>
+  <circle cx="606" cy="372" r="10" fill="#F5DCAB"/>
+  <path d="M319 140L352 170M639 140L606 170M319 402L352 372M639 402L606 372" stroke="#F5DCAB" stroke-width="4" stroke-linecap="round"/>
+  <rect x="271" y="220" width="48" height="48" rx="12" fill="#67B0FF"/>
+  <path d="M295 232L302 248H319L305 258L311 274L295 264L279 274L285 258L271 248H288L295 232Z" fill="#0B1220"/>
+  <rect x="644" y="220" width="48" height="48" rx="12" fill="#A07BFF"/>
+  <path d="M659 234H677V252H659V234ZM653 258H683V266H653V258Z" fill="#0B1220"/>
+  <text x="220" y="129" fill="#F6E7C6" font-size="28" font-family="Georgia, serif" font-weight="700">Choose the exact bag area</text>
+</svg>

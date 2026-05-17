@@ -1,0 +1,37 @@
+<svg width="960" height="560" viewBox="0 0 960 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="92" y1="44" x2="855" y2="521" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#112743"/>
+      <stop offset="1" stop-color="#070B12"/>
+    </linearGradient>
+    <linearGradient id="bar1" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#57A7FF"/>
+      <stop offset="1" stop-color="#2D6EE0"/>
+    </linearGradient>
+    <linearGradient id="bar2" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#A98BFF"/>
+      <stop offset="1" stop-color="#7458D6"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="560" fill="url(#bg)"/>
+  <circle cx="812" cy="108" r="144" fill="#255EA3" fill-opacity="0.16"/>
+  <circle cx="172" cy="484" r="176" fill="#183D68" fill-opacity="0.18"/>
+  <rect x="169" y="118" width="624" height="324" rx="24" fill="#0B1220" stroke="#E7CC92" stroke-opacity="0.22"/>
+  <text x="210" y="152" fill="#F6E7C6" font-size="24" font-family="Georgia, serif" font-weight="700">Track every run and total gains</text>
+  <path d="M224 382H742" stroke="#E7CC92" stroke-opacity="0.2"/>
+  <path d="M224 330H742" stroke="#E7CC92" stroke-opacity="0.12"/>
+  <path d="M224 278H742" stroke="#E7CC92" stroke-opacity="0.12"/>
+  <path d="M224 226H742" stroke="#E7CC92" stroke-opacity="0.12"/>
+  <rect x="255" y="290" width="56" height="92" rx="10" fill="url(#bar1)"/>
+  <rect x="332" y="246" width="56" height="136" rx="10" fill="url(#bar1)"/>
+  <rect x="409" y="206" width="56" height="176" rx="10" fill="url(#bar2)"/>
+  <rect x="486" y="164" width="56" height="218" rx="10" fill="url(#bar1)"/>
+  <rect x="563" y="232" width="56" height="150" rx="10" fill="url(#bar2)"/>
+  <rect x="640" y="188" width="56" height="194" rx="10" fill="url(#bar1)"/>
+  <text x="260" y="409" fill="#87B8FF" font-size="16" font-family="Arial, sans-serif">R1</text>
+  <text x="337" y="409" fill="#87B8FF" font-size="16" font-family="Arial, sans-serif">R2</text>
+  <text x="414" y="409" fill="#87B8FF" font-size="16" font-family="Arial, sans-serif">R3</text>
+  <text x="491" y="409" fill="#87B8FF" font-size="16" font-family="Arial, sans-serif">R4</text>
+  <text x="568" y="409" fill="#87B8FF" font-size="16" font-family="Arial, sans-serif">R5</text>
+  <text x="645" y="409" fill="#87B8FF" font-size="16" font-family="Arial, sans-serif">R6</text>
+</svg>

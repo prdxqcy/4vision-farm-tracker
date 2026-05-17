@@ -1,0 +1,49 @@
+<svg width="960" height="560" viewBox="0 0 960 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="90" y1="34" x2="835" y2="549" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10233E"/>
+      <stop offset="1" stop-color="#060A12"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="250" y1="118" x2="770" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111928"/>
+      <stop offset="1" stop-color="#0A0E15"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F2D39A"/>
+      <stop offset="1" stop-color="#C49745"/>
+    </linearGradient>
+    <filter id="shadow" x="135" y="79" width="691" height="381" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="960" height="560" fill="url(#bg)"/>
+  <circle cx="144" cy="102" r="154" fill="#1A4F8B" fill-opacity="0.22"/>
+  <circle cx="879" cy="496" r="194" fill="#123D69" fill-opacity="0.16"/>
+  <g opacity="0.22" stroke="#E7CC92">
+    <path d="M0 451H960"/>
+    <path d="M0 132H960"/>
+    <path d="M164 0V560"/>
+    <path d="M804 0V560"/>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="179" y="123" width="603" height="293" rx="22" fill="url(#panel)" stroke="#E7CC92" stroke-opacity="0.24"/>
+  </g>
+  <rect x="214" y="158" width="533" height="210" rx="16" fill="#0C1422" stroke="#E7CC92" stroke-opacity="0.16"/>
+  <rect x="244" y="188" width="473" height="150" rx="12" fill="#09101B"/>
+  <rect x="269" y="214" width="126" height="98" rx="12" fill="#0F1E33" stroke="#4EA0FF" stroke-opacity="0.45"/>
+  <rect x="422" y="214" width="126" height="98" rx="12" fill="#0F1E33" stroke="#4EA0FF" stroke-opacity="0.45"/>
+  <rect x="575" y="214" width="117" height="98" rx="12" fill="#0F1E33" stroke="#4EA0FF" stroke-opacity="0.45"/>
+  <path d="M324 233L339 265L374 269L347 291L354 324L324 306L294 324L301 291L274 269L309 265L324 233Z" fill="#67B0FF"/>
+  <path d="M485 226L500 260L537 264L508 287L516 323L485 304L454 323L462 287L433 264L470 260L485 226Z" fill="#A97BFF"/>
+  <rect x="600" y="233" width="66" height="18" rx="9" fill="#1B3354"/>
+  <rect x="600" y="264" width="66" height="18" rx="9" fill="#1B3354"/>
+  <rect x="600" y="295" width="42" height="18" rx="9" fill="#1B3354"/>
+  <path d="M596 332H666" stroke="#63DA8C" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="629" cy="174" r="56" fill="#12345C" fill-opacity="0.5"/>
+  <path d="M618 162L643 176L618 190V162Z" fill="url(#accent)"/>
+  <path d="M278 406H683" stroke="#E7CC92" stroke-opacity="0.18"/>
+  <rect x="279" y="385" width="116" height="12" rx="6" fill="#2A6EDC"/>
+  <rect x="411" y="385" width="84" height="12" rx="6" fill="#355A94"/>
+  <rect x="510" y="385" width="173" height="12" rx="6" fill="#355A94"/>
+  <text x="264" y="115" fill="#F6E7C6" font-size="28" font-family="Georgia, serif" font-weight="700">Live overlay scan</text>
+</svg>
