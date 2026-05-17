@@ -21,6 +21,7 @@ import json
 import time
 import signal
 import traceback
+from collections import deque
 from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
@@ -99,15 +100,15 @@ ITEM_CONFIGS = [
         "id": "crystals",
         "name": "Crystals",
         "count_mode": "instances",
-        "max_matches": 10,
+        "max_matches": 6,           # unlikely to carry more than 6 crystals
         "template_file": "crystals.png",
-        "threshold": CRYSTAL_THRESHOLD,  # stricter to avoid false positives in busy bags
+        "threshold": CRYSTAL_THRESHOLD,
     },
     {
         "id": "arcanes",
         "name": "Arcanes",
-        "count_mode": "best-stack",
-        "max_matches": 3,
+        "count_mode": "best-stack", # reads the stack number via OCR
+        "max_matches": 5,
         "template_file": "arcane.png",
         "threshold": MATCH_THRESHOLD,
     },
@@ -115,7 +116,7 @@ ITEM_CONFIGS = [
         "id": "speed-potions",
         "name": "Speed Potions",
         "count_mode": "best-stack",
-        "max_matches": 3,
+        "max_matches": 5,
         "template_file": "speedpotions.png",
         "threshold": MATCH_THRESHOLD,
     },
@@ -124,11 +125,12 @@ ITEM_CONFIGS = [
 # ---------------------------------------------------------------------------
 # Template matching thresholds (tune after adding real templates)
 # ---------------------------------------------------------------------------
-MATCH_THRESHOLD = 0.65        # cv2.TM_CCOEFF_NORMED confidence (0–1, higher = stricter)
-CRYSTAL_THRESHOLD = 0.75      # crystals get a stricter threshold to cut false positives
+MATCH_THRESHOLD = 0.60        # default threshold for arcanes/potions
+CRYSTAL_THRESHOLD = 0.82      # crystals need a high score — many bag icons look similar
 MAX_SCREENSHOT_WIDTH = 1920   # downsample wide screenshots to cap memory usage
-DEDUP_DISTANCE_PX = 20   # pixels; nearby duplicates within this radius are merged
-SCALES = [0.88, 0.94, 1.0, 1.06, 1.12]  # multi-scale scan
+DEDUP_DISTANCE_PX = 30        # merge candidates within this many pixels (bigger = fewer duplicates)
+SCALES = [0.94, 1.0, 1.06]   # 3 scales instead of 5 — faster, less RAM, good enough
+STABILITY_WINDOW = 3          # report median count over this many consecutive scans
 
 # ---------------------------------------------------------------------------
 # Calibration / scan region config
@@ -333,6 +335,24 @@ def read_stack_count(screenshot, match):
     return 1  # fallback: assume single item if OCR unavailable
 
 # ---------------------------------------------------------------------------
+# Stability filter – median over last STABILITY_WINDOW scans per item.
+# Smooths out frame-to-frame noise and false-positive spikes.
+# ---------------------------------------------------------------------------
+
+_count_history: dict = {}  # item_id -> deque of raw counts
+
+def stable_count(item_id: str, raw: int) -> int:
+    if item_id not in _count_history:
+        _count_history[item_id] = deque(maxlen=STABILITY_WINDOW)
+    _count_history[item_id].append(raw)
+    hist = sorted(_count_history[item_id])
+    return hist[len(hist) // 2]  # median
+
+def reset_stability():
+    """Clear rolling history (called on scanner restart)."""
+    _count_history.clear()
+
+# ---------------------------------------------------------------------------
 # Main scan function
 # ---------------------------------------------------------------------------
 
@@ -354,17 +374,21 @@ def scan_inventory(config):
         )
 
         if item_cfg["count_mode"] == "instances":
-            count = len(matches)
+            raw = len(matches)
         elif item_cfg["count_mode"] == "best-stack":
             if matches:
-                # Use OCR on the best (highest score) match
                 best = max(matches, key=lambda m: m["score"])
-                count = read_stack_count(screenshot, best)
+                ocr_val = read_stack_count(screenshot, best)
+                # If OCR falls back to 1 but we found multiple matches,
+                # count slots instead (handles games where stacks appear as separate slots)
+                raw = ocr_val if (ocr_val > 1 or len(matches) == 1) else len(matches)
             else:
-                count = 0
+                raw = 0
         else:
-            count = len(matches)
+            raw = len(matches)
 
+        # Apply stability median filter
+        count = stable_count(item_cfg["id"], raw)
         snapshot[item_cfg["id"]] = count
 
         for m in matches:
@@ -448,6 +472,7 @@ if hasattr(signal, "SIGBREAK"):
 def main():
     global _running
 
+    reset_stability()
     emit_status("starting", "Python capture worker initialised")
 
     if not HAS_MSS or not HAS_CV2:

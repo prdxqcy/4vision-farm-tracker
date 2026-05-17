@@ -1,7 +1,7 @@
 {
   "name": "farmtracks",
   "private": true,
-  "version": "1.0.26",
+  "version": "1.0.27",
   "main": "desktop/main.cjs",
   "workspaces": [
     "client",
@@ -56,12 +56,16 @@
       {
         "from": "desktop/python/dist/farmtracks-capture",
         "to": "python/farmtracks-capture",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "desktop/python/templates",
         "to": "python/templates",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "protocols": [
