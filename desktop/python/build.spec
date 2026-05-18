@@ -9,21 +9,22 @@ from PyInstaller.utils.hooks import collect_all
 block_cipher = None
 
 rapidocr_datas, rapidocr_binaries, rapidocr_hiddenimports = collect_all("rapidocr_onnxruntime")
+ort_datas, ort_binaries, ort_hiddenimports = collect_all("onnxruntime")
 
 a = Analysis(
     ['capture_worker.py'],
     pathex=['.'],
-    binaries=rapidocr_binaries,
-    datas=rapidocr_datas,
+    binaries=rapidocr_binaries + ort_binaries,
+    datas=rapidocr_datas + ort_datas,
     hiddenimports=[
         'mss',
         'numpy',
         'PIL',
-    ] + rapidocr_hiddenimports,
+    ] + rapidocr_hiddenimports + ort_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['cv2', 'pytesseract', 'easyocr', 'torch', 'torchvision'],
+    excludes=['pytesseract', 'easyocr', 'torch', 'torchvision'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
