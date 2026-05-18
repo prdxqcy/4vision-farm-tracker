@@ -1,11 +1,8 @@
 const path = require("path");
-const fs = require("fs/promises");
 const fsSync = require("fs");
-const os = require("os");
-const { execFile, spawn } = require("child_process");
+const { spawn } = require("child_process");
 const readline = require("readline");
-const { app, BrowserWindow, ipcMain, nativeImage, screen, globalShortcut } = require("electron");
-const screenshot = require("screenshot-desktop");
+const { app, BrowserWindow, ipcMain, screen, globalShortcut } = require("electron");
 
 const OVERLAY_QUERY = "capture-overlay";
 const DEV_SERVER_URL = "http://127.0.0.1:5173";
@@ -17,8 +14,6 @@ let localServer = null;
 let mainWindow = null;
 let overlayWindow = null;
 let pendingOverlayOptions = {};
-let cachedAutoHotkeyPath = undefined;
-
 // Python scanner worker state
 let pythonWorker = null;
 let pythonWorkerRunning = false;
@@ -106,222 +101,7 @@ function sharedWebPreferences() {
   };
 }
 
-function getAutoHotkeyScriptPath() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, "app.asar.unpacked", "desktop", "ahk", "find-matches.ahk");
-  }
 
-  return path.join(__dirname, "ahk", "find-matches.ahk");
-}
-
-async function fileExists(targetPath) {
-  try {
-    await fs.access(targetPath);
-    return true;
-  } catch (_error) {
-    return false;
-  }
-}
-
-async function findAutoHotkeyPath() {
-  if (cachedAutoHotkeyPath !== undefined) {
-    return cachedAutoHotkeyPath;
-  }
-
-  const candidates = [
-    path.join(process.env.ProgramFiles || "", "AutoHotkey", "v2", "AutoHotkey64.exe"),
-    path.join(process.env.ProgramFiles || "", "AutoHotkey", "AutoHotkey64.exe"),
-    path.join(process.env.ProgramFiles || "", "AutoHotkey", "AutoHotkey.exe"),
-    path.join(process.env["ProgramFiles(x86)"] || "", "AutoHotkey", "AutoHotkey64.exe"),
-    path.join(process.env["ProgramFiles(x86)"] || "", "AutoHotkey", "AutoHotkey.exe")
-  ].filter(Boolean);
-
-  for (const candidate of candidates) {
-    if (await fileExists(candidate)) {
-      cachedAutoHotkeyPath = candidate;
-      return candidate;
-    }
-  }
-
-  cachedAutoHotkeyPath = null;
-  return null;
-}
-
-function buildAhkConfig(profile) {
-  const displayBounds = screen.getAllDisplays().reduce((bounds, display) => {
-    const right = display.bounds.x + display.bounds.width;
-    const bottom = display.bounds.y + display.bounds.height;
-
-    return {
-      left: Math.min(bounds.left, display.bounds.x),
-      top: Math.min(bounds.top, display.bounds.y),
-      right: Math.max(bounds.right, right),
-      bottom: Math.max(bounds.bottom, bottom)
-    };
-  }, {
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0
-  });
-  const lines = [
-    [
-      "bounds",
-      displayBounds.left,
-      displayBounds.top,
-      displayBounds.right,
-      displayBounds.bottom,
-      72,
-      40,
-      20
-    ].join("|")
-  ];
-
-  for (const item of profile?.items ?? []) {
-    if (!item?.templateDataUrl || !item?.itemId) {
-      continue;
-    }
-
-    const maxMatches = item.itemId === "crystals" ? 10 : 4;
-    const variation = item.itemId === "crystals" ? 42 : 34;
-    lines.push(`${item.itemId}|__TEMPLATE__|__SLOT_SIZE__|${maxMatches}|${variation}|__SCALE__`);
-  }
-
-  return lines;
-}
-
-async function writeAhkTemplates(tempDir, profile) {
-  const templateEntries = [];
-  const scales = [0.88, 0.94, 1, 1.06, 1.12];
-
-  for (const item of profile?.items ?? []) {
-    if (!item?.templateDataUrl || !item?.itemId) {
-      continue;
-    }
-
-    const baseImage = nativeImage.createFromDataURL(item.templateDataUrl);
-
-    for (const scale of scales) {
-      const width = Math.max(18, Math.round(baseImage.getSize().width * scale));
-      const height = Math.max(18, Math.round(baseImage.getSize().height * scale));
-      const image = scale === 1 ? baseImage : baseImage.resize({ width, height, quality: "best" });
-      const templatePath = path.join(tempDir, `${item.itemId}-${String(scale).replace(".", "_")}.png`);
-      await fs.writeFile(templatePath, image.toPNG());
-      templateEntries.push({
-        itemId: item.itemId,
-        path: templatePath,
-        slotSize: width,
-        scale
-      });
-    }
-  }
-
-  return templateEntries;
-}
-
-async function runAutoHotkeyDetector(profile) {
-  const autoHotkeyPath = await findAutoHotkeyPath();
-  const scriptPath = getAutoHotkeyScriptPath();
-  const scriptExists = await fileExists(scriptPath);
-
-  if (!autoHotkeyPath || !scriptExists) {
-    return {
-      available: false,
-      provider: "js-fallback",
-      matches: [],
-      debug: {
-        stage: "preflight",
-        autoHotkeyPath: autoHotkeyPath || "",
-        scriptPath,
-        scriptExists,
-        reason: !autoHotkeyPath ? "autohotkey-not-found" : "script-not-found"
-      }
-    };
-  }
-
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "farmtracks-ahk-"));
-
-  try {
-    const configLines = buildAhkConfig(profile);
-    const templateEntries = await writeAhkTemplates(tempDir, profile);
-    const inputPath = path.join(tempDir, "input.txt");
-    const outputPath = path.join(tempDir, "output.txt");
-
-    const entryLines = templateEntries.map((entry) => {
-      const templateLine = configLines.find((line) => line.startsWith(`${entry.itemId}|`));
-      return templateLine
-        .replace("__TEMPLATE__", entry.path)
-        .replace("__SLOT_SIZE__", String(entry.slotSize))
-        .replace("__SCALE__", String(entry.scale));
-    });
-
-    await fs.writeFile(inputPath, [configLines[0], ...entryLines].join("\n"), "utf8");
-    const startedAt = Date.now();
-
-    await new Promise((resolve, reject) => {
-      execFile(autoHotkeyPath, [scriptPath, inputPath, outputPath], { windowsHide: true, timeout: 15000 }, (error, stdout, stderr) => {
-        if (error) {
-          error.stdout = stdout;
-          error.stderr = stderr;
-          reject(error);
-          return;
-        }
-
-        resolve();
-      });
-    });
-
-    const rawOutput = await fs.readFile(outputPath, "utf8");
-    const lines = rawOutput.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    const matches = [];
-
-    for (const line of lines.slice(1)) {
-      const [itemId, x, y, slotSize, scale] = line.split("|");
-      matches.push({
-        itemId,
-        x: Number.parseInt(x, 10),
-        y: Number.parseInt(y, 10),
-        slotSize: Number.parseInt(slotSize, 10),
-        scale: Number.parseFloat(scale) || 1
-      });
-    }
-
-    return {
-      available: true,
-      provider: "autohotkey",
-      matches,
-      debug: {
-        stage: "completed",
-        autoHotkeyPath,
-        scriptPath,
-        scriptExists,
-        runtimeMs: Date.now() - startedAt,
-        rawLineCount: lines.length,
-        rawOutputPreview: lines.slice(0, 6),
-        matchCount: matches.length,
-        reason: matches.length > 0 ? "matches-found" : "no-matches-returned"
-      }
-    };
-  } catch (error) {
-    return {
-      available: false,
-      provider: "js-fallback",
-      matches: [],
-      debug: {
-        stage: "failed",
-        autoHotkeyPath,
-        scriptPath,
-        scriptExists,
-        reason: "execution-failed",
-        errorMessage: error instanceof Error ? error.message : String(error),
-        stderr: typeof error?.stderr === "string" ? error.stderr.trim() : "",
-        stdout: typeof error?.stdout === "string" ? error.stdout.trim() : ""
-      }
-    };
-  } finally {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  }
-}
 
 function getPythonWorkerPath() {
   if (app.isPackaged) {
@@ -333,31 +113,64 @@ function getPythonWorkerPath() {
 }
 
 // ---------------------------------------------------------------------------
-// Scan region – user-drawn bounding box restricting Python scanner to bag area
+// Tracker regions – per-item screen regions for OCR scanning
 // ---------------------------------------------------------------------------
 
-const SCAN_REGION_FILE = () => path.join(app.getPath("userData"), "scan_region.json");
+const DEFAULT_TRACKER_REGIONS = {
+  crystals: { region: null },
+  arcanes: { region: null },
+  "speed-potions": { region: null },
+};
 
-function loadScanRegion() {
+const TRACKER_LABELS = {
+  crystals: "Crystals",
+  arcanes: "Arcanes",
+  "speed-potions": "Potions",
+};
+
+const TRACKER_REGIONS_FILE = () => path.join(app.getPath("userData"), "tracker_regions.json");
+
+let trackerRegions = JSON.parse(JSON.stringify(DEFAULT_TRACKER_REGIONS));
+
+function loadTrackerRegions() {
   try {
-    const data = fsSync.readFileSync(SCAN_REGION_FILE(), "utf8");
-    return JSON.parse(data);
+    const data = fsSync.readFileSync(TRACKER_REGIONS_FILE(), "utf8");
+    const saved = JSON.parse(data);
+    trackerRegions = { ...JSON.parse(JSON.stringify(DEFAULT_TRACKER_REGIONS)), ...saved };
   } catch (_) {
-    return null;
+    trackerRegions = JSON.parse(JSON.stringify(DEFAULT_TRACKER_REGIONS));
   }
 }
 
-function saveScanRegionData(region) {
-  fsSync.writeFileSync(SCAN_REGION_FILE(), JSON.stringify(region));
+function saveTrackerRegions() {
+  try {
+    fsSync.writeFileSync(TRACKER_REGIONS_FILE(), JSON.stringify(trackerRegions, null, 2));
+  } catch (_) {}
+}
+
+function sendConfigToPython() {
+  if (!pythonWorker || !pythonWorker.stdin.writable) return;
+  const payload = {
+    type: "config",
+    trackers: trackerRegions,
+    pollIntervalMs: 650,
+  };
+  try {
+    pythonWorker.stdin.write(JSON.stringify(payload) + "\n");
+  } catch (_) {}
 }
 
 let regionSelectorWindow = null;
+let pendingTrackerKey = null;
 
-function openRegionSelector() {
+function openRegionSelector(trackerKey) {
   if (regionSelectorWindow) {
     regionSelectorWindow.focus();
     return;
   }
+
+  pendingTrackerKey = trackerKey || "crystals";
+  const label = TRACKER_LABELS[pendingTrackerKey] ?? pendingTrackerKey;
 
   regionSelectorWindow = new BrowserWindow({
     fullscreen: true,
@@ -371,7 +184,9 @@ function openRegionSelector() {
     },
   });
 
-  regionSelectorWindow.loadFile(path.join(__dirname, "select-region.html"));
+  regionSelectorWindow.loadFile(path.join(__dirname, "select-region.html"), {
+    query: { trackerKey: pendingTrackerKey, label },
+  });
 
   const cleanup = () => {
     ipcMain.removeAllListeners("select-region:done");
@@ -380,15 +195,18 @@ function openRegionSelector() {
       regionSelectorWindow.close();
     }
     regionSelectorWindow = null;
+    pendingTrackerKey = null;
   };
 
   ipcMain.once("select-region:done", (_event, region) => {
-    saveScanRegionData(region);
-    broadcastToAllWindows("farmtracks:scan-region-updated", region);
+    const key = pendingTrackerKey;
+    if (key && trackerRegions[key] !== undefined) {
+      trackerRegions[key] = { region };
+      saveTrackerRegions();
+      broadcastToAllWindows("farmtracks:tracker-regions-updated", trackerRegions);
+      sendConfigToPython();
+    }
     cleanup();
-    // Restart Python worker so it picks up the new scan region
-    stopPythonWorker();
-    setTimeout(() => startPythonWorker(), 500);
   });
 
   ipcMain.once("select-region:cancel", cleanup);
@@ -396,107 +214,10 @@ function openRegionSelector() {
     ipcMain.removeAllListeners("select-region:done");
     ipcMain.removeAllListeners("select-region:cancel");
     regionSelectorWindow = null;
+    pendingTrackerKey = null;
   });
 }
 
-// ---------------------------------------------------------------------------
-// Tesseract OCR – auto-download and silent install on first run
-// ---------------------------------------------------------------------------
-
-const TESSERACT_SETUP_URL =
-  "https://github.com/UB-Mannheim/tesseract/releases/download/v5.5.0.20241111/tesseract-ocr-w64-setup-5.5.0.20241111.exe";
-
-function getTesseractExePath() {
-  if (process.platform !== "win32") return null;
-  const candidates = [
-    path.join(app.getPath("userData"), "tesseract", "tesseract.exe"),
-    "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
-    "C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe",
-  ];
-  for (const c of candidates) {
-    if (fsSync.existsSync(c)) return c;
-  }
-  return null;
-}
-
-function downloadFile(url, dest) {
-  return new Promise((resolve, reject) => {
-    const https = require("https");
-    const http = require("http");
-    const out = fsSync.createWriteStream(dest);
-    out.on("error", reject);
-
-    function fetch(u) {
-      const mod = u.startsWith("https") ? https : http;
-      mod.get(u, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          fetch(res.headers.location);
-          return;
-        }
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode}`));
-          return;
-        }
-        res.pipe(out);
-        out.on("finish", () => out.close(resolve));
-      }).on("error", (err) => {
-        try { fsSync.unlinkSync(dest); } catch (_) {}
-        reject(err);
-      });
-    }
-
-    fetch(url);
-  });
-}
-
-async function ensureTesseract() {
-  if (process.platform !== "win32") return;
-  if (getTesseractExePath()) return; // already installed
-
-  const installDir = path.join(app.getPath("userData"), "tesseract");
-  const installerPath = path.join(os.tmpdir(), "farmtracks-tesseract-setup.exe");
-
-  broadcastToAllWindows("farmtracks:ocr-setup", {
-    status: "downloading",
-    message: "Setting up OCR engine for the first time (~22 MB)…",
-  });
-
-  try {
-    await downloadFile(TESSERACT_SETUP_URL, installerPath);
-
-    broadcastToAllWindows("farmtracks:ocr-setup", {
-      status: "installing",
-      message: "Installing OCR engine…",
-    });
-
-    const { spawnSync } = require("child_process");
-    spawnSync(
-      installerPath,
-      ["/VERYSILENT", "/NORESTART", `/DIR=${installDir}`],
-      { timeout: 180000, windowsHide: true }
-    );
-
-    try { fsSync.unlinkSync(installerPath); } catch (_) {}
-
-    if (getTesseractExePath()) {
-      broadcastToAllWindows("farmtracks:ocr-setup", { status: "done", message: "OCR ready" });
-      // Restart Python worker so it picks up the new TESSERACT_CMD env var
-      stopPythonWorker();
-      startPythonWorker();
-    } else {
-      broadcastToAllWindows("farmtracks:ocr-setup", {
-        status: "error",
-        message: "OCR install failed — stack counts will show as 1",
-      });
-    }
-  } catch (err) {
-    try { fsSync.unlinkSync(installerPath); } catch (_) {}
-    broadcastToAllWindows("farmtracks:ocr-setup", {
-      status: "error",
-      message: "OCR download failed — stack counts will show as 1",
-    });
-  }
-}
 
 function getPythonCommand() {
   if (app.isPackaged) {
@@ -533,19 +254,11 @@ function startPythonWorker() {
   if (pythonWorker) return; // already running
 
   const { cmd, args } = getPythonCommand();
-  const workerEnv = { ...process.env };
-  const tesseractExe = getTesseractExePath();
-  if (tesseractExe) workerEnv.TESSERACT_CMD = tesseractExe;
-  const scanRegion = loadScanRegion();
-  if (scanRegion) {
-    workerEnv.FARMTRACKS_SCAN_REGION = `${scanRegion.x},${scanRegion.y},${scanRegion.width},${scanRegion.height}`;
-  }
 
   try {
     pythonWorker = spawn(cmd, args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
-      env: workerEnv,
     });
   } catch (err) {
     broadcastToAllWindows("farmtracks:scanner-update", {
@@ -559,6 +272,9 @@ function startPythonWorker() {
   }
 
   pythonWorkerRunning = true;
+
+  // Send initial tracker region config so Python starts scanning immediately
+  setTimeout(sendConfigToPython, 200);
 
   const rl = readline.createInterface({ input: pythonWorker.stdout });
 
@@ -781,51 +497,6 @@ ipcMain.handle("farmtracks:set-overlay-opacity", (_event, opacity) => {
   return safeOpacity;
 });
 
-ipcMain.handle("farmtracks:capture-screen", async (event, options = {}) => {
-  const currentWindow = BrowserWindow.fromWebContents(event.sender);
-
-  if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {
-    currentWindow.hide();
-    await new Promise((resolve) => setTimeout(resolve, 180));
-  }
-
-  const image = await screenshot({ format: "png" });
-
-  if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {
-    currentWindow.show();
-    currentWindow.focus();
-  }
-
-  return `data:image/png;base64,${image.toString("base64")}`;
-});
-
-ipcMain.handle("farmtracks:detect-auto-capture", async (event, profile, options = {}) => {
-  const currentWindow = BrowserWindow.fromWebContents(event.sender);
-
-  if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {
-    currentWindow.hide();
-    await new Promise((resolve) => setTimeout(resolve, 180));
-  }
-
-  try {
-    const [image, detection] = await Promise.all([
-      screenshot({ format: "png" }),
-      runAutoHotkeyDetector(profile)
-    ]);
-
-    return {
-      screenshotDataUrl: `data:image/png;base64,${image.toString("base64")}`,
-      provider: detection.provider,
-      matches: detection.matches,
-      debug: detection.debug ?? null
-    };
-  } finally {
-    if (options.hideCurrentWindow && currentWindow && !currentWindow.isDestroyed()) {
-      currentWindow.show();
-      currentWindow.focus();
-    }
-  }
-});
 
 ipcMain.handle("farmtracks:close-window", (event) => {
   const currentWindow = BrowserWindow.fromWebContents(event.sender);
@@ -856,13 +527,20 @@ ipcMain.handle("farmtracks:scanner-end-round", () => {
   return { ok: true };
 });
 
-ipcMain.handle("farmtracks:open-region-selector", () => { openRegionSelector(); return { ok: true }; });
-ipcMain.handle("farmtracks:get-scan-region", () => loadScanRegion());
-ipcMain.handle("farmtracks:clear-scan-region", () => {
-  try { fsSync.unlinkSync(SCAN_REGION_FILE()); } catch (_) {}
-  broadcastToAllWindows("farmtracks:scan-region-updated", null);
-  stopPythonWorker();
-  setTimeout(() => startPythonWorker(), 500);
+ipcMain.handle("farmtracks:open-tracker-region-selector", (_event, trackerKey) => {
+  openRegionSelector(trackerKey);
+  return { ok: true };
+});
+
+ipcMain.handle("farmtracks:get-tracker-regions", () => trackerRegions);
+
+ipcMain.handle("farmtracks:clear-tracker-region", (_event, trackerKey) => {
+  if (trackerRegions[trackerKey] !== undefined) {
+    trackerRegions[trackerKey] = { region: null };
+    saveTrackerRegions();
+    broadcastToAllWindows("farmtracks:tracker-regions-updated", trackerRegions);
+    sendConfigToPython();
+  }
   return { ok: true };
 });
 
@@ -947,12 +625,11 @@ app.whenReady().then(async () => {
   currentHotkeys = loadHotkeysConfig();
   registerHotkeys(currentHotkeys);
 
+  // Load saved tracker regions before starting the Python worker
+  loadTrackerRegions();
+
   // Auto-start the Python scanner
   startPythonWorker();
-
-  // Download and install Tesseract OCR silently in the background if not present.
-  // When done it restarts the Python worker so TESSERACT_CMD is available.
-  ensureTesseract().catch(() => {});
 });
 
 app.on("window-all-closed", async () => {

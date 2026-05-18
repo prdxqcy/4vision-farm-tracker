@@ -1,32 +1,29 @@
 # PyInstaller spec file for farmtracks-capture
 # Run from the desktop/python directory:
-#   pyinstaller build.spec --clean
+#   pyinstaller build.spec --clean -y
 #
 # Output: desktop/python/dist/farmtracks-capture/farmtracks-capture.exe
-# Copy that folder into desktop/python/dist/ so electron-builder can pick it up.
 
-import os
+from PyInstaller.utils.hooks import collect_all
+
 block_cipher = None
+
+rapidocr_datas, rapidocr_binaries, rapidocr_hiddenimports = collect_all("rapidocr_onnxruntime")
 
 a = Analysis(
     ['capture_worker.py'],
     pathex=['.'],
-    binaries=[],
-    datas=[
-        # Ship template images alongside the exe
-        ('templates', 'templates'),
-    ] + ([('capture_config.json', '.')] if os.path.isfile('capture_config.json') else []),
+    binaries=rapidocr_binaries,
+    datas=rapidocr_datas,
     hiddenimports=[
         'mss',
-        'cv2',
         'numpy',
         'PIL',
-        'pytesseract',
-    ],
+    ] + rapidocr_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['easyocr', 'torch', 'torchvision'],
+    excludes=['cv2', 'pytesseract', 'easyocr', 'torch', 'torchvision'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -45,7 +42,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # must stay console so Electron can read stdout
+    console=True,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,

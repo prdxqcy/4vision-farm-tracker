@@ -1,12 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  NARWASHI_AUTO_CAPTURE_ITEMS,
-  captureDesktopScreenshot,
-  clearNarwashiAutoCaptureProfile,
-  createNarwashiAutoCaptureProfile,
-  loadNarwashiAutoCaptureProfile,
-  scanNarwashiScreen
-} from "./autoCapture";
 import { MAPS, STACK_SIZE } from "./mapConfig";
 import { loadPlayers, loadUiState, savePlayers, saveUiState } from "./storage";
 import {
@@ -85,53 +77,6 @@ function buildGuideTranslationUrl(language, guideText) {
   return translateUrl.toString();
 }
 
-function formatAutoCaptureDebugLines(lastResult) {
-  if (!lastResult?.debug) {
-    return [];
-  }
-
-  const lines = [];
-  const desktopDebug = lastResult.debug.desktopDetection;
-
-  lines.push(`Detector: ${lastResult.provider === "autohotkey" ? "AutoHotkey" : "Built-in scanner"}`);
-
-  if (desktopDebug) {
-    lines.push(`AHK stage: ${desktopDebug.stage || "unknown"}`);
-
-    if (desktopDebug.reason) {
-      lines.push(`AHK reason: ${desktopDebug.reason}`);
-    }
-
-    if (desktopDebug.matchCount !== undefined) {
-      lines.push(`AHK matches: ${desktopDebug.matchCount}`);
-    }
-
-    if (desktopDebug.runtimeMs !== undefined) {
-      lines.push(`AHK runtime: ${desktopDebug.runtimeMs}ms`);
-    }
-
-    if (desktopDebug.autoHotkeyPath) {
-      lines.push(`AHK exe: ${desktopDebug.autoHotkeyPath}`);
-    }
-
-    if (desktopDebug.errorMessage) {
-      lines.push(`AHK error: ${desktopDebug.errorMessage}`);
-    }
-
-    if (desktopDebug.stderr) {
-      lines.push(`AHK stderr: ${desktopDebug.stderr}`);
-    }
-  } else {
-    lines.push("AHK stage: desktop bridge unavailable");
-  }
-
-  if (lastResult.provider !== "autohotkey" && lastResult.debug.fallbackReason) {
-    lines.push(`Fallback: ${lastResult.debug.fallbackReason}`);
-    lines.push(`Built-in matches: ${lastResult.debug.jsMatchCount}`);
-  }
-
-  return lines;
-}
 
 function splitAmount(total) {
   return {
@@ -152,12 +97,6 @@ function buildInventoryInputs(map, snapshot = {}) {
   }, {});
 }
 
-function mergeWithCurrentSnapshot(map, currentSnapshot = {}, detectedSnapshot = {}) {
-  return map.items.reduce((snapshot, item) => {
-    snapshot[item.id] = Math.max(currentSnapshot[item.id] ?? 0, detectedSnapshot[item.id] ?? 0);
-    return snapshot;
-  }, {});
-}
 
 function OverlayWindowControls({ onClose, onOpenDashboard, onOpacityChange, opacityValue, showDashboardButton }) {
   return (
@@ -397,166 +336,6 @@ function WelcomeGuideModal({
   );
 }
 
-function AutoCapturePanel({
-  busy,
-  hasProfile,
-  lastResult,
-  message,
-  onAutoCapture,
-  onAutoFill,
-  onClearCalibration,
-  onStartCalibration
-}) {
-  const debugLines = formatAutoCaptureDebugLines(lastResult);
-
-  return (
-    <section className="page-panel auto-capture-panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Narwashi Auto Capture</p>
-          <h2>Read tracked items from the game screen</h2>
-          <p className="subtle-text">
-            Calibrate once by clicking a crystal, arcane, and speed potion on a live screenshot. FarmTracks will then
-            scan visible bags anywhere on screen and fill the current inventory totals automatically. The desktop app
-            now tries AutoHotkey image matching first when it is installed.
-          </p>
-        </div>
-        <div className="auto-capture-actions">
-          <button type="button" className="secondary-button" onClick={onStartCalibration} disabled={busy}>
-            {hasProfile ? "Recalibrate" : "Calibrate"}
-          </button>
-          <button type="button" className="ghost-button" onClick={onAutoFill} disabled={!hasProfile || busy}>
-            Auto-fill
-          </button>
-          <button type="button" className="primary-button" onClick={onAutoCapture} disabled={!hasProfile || busy}>
-            Auto-capture round
-          </button>
-        </div>
-      </div>
-
-      <div className="auto-capture-meta">
-        <span className={`status-pill ${hasProfile ? "" : "offline"}`}>
-          {hasProfile ? "Calibration ready" : "Calibration needed"}
-        </span>
-        {hasProfile ? (
-          <button type="button" className="ghost-button auto-capture-clear" onClick={onClearCalibration} disabled={busy}>
-            Clear saved calibration
-          </button>
-        ) : null}
-      </div>
-
-      {message ? <p className="helper-text auto-capture-message">{message}</p> : null}
-
-      {lastResult ? (
-        <>
-          <div className="auto-capture-results">
-            <div className="meta-entry">
-              <span>Last scan</span>
-              <strong>{lastResult.matches.length} matched slots</strong>
-            </div>
-            <div className="meta-entry">
-              <span>Crystals</span>
-              <strong>{lastResult.snapshot.crystals}</strong>
-            </div>
-            <div className="meta-entry">
-              <span>Arcanes</span>
-              <strong>{lastResult.snapshot.arcanes}</strong>
-            </div>
-            <div className="meta-entry">
-              <span>Speed Potions</span>
-              <strong>{lastResult.snapshot["speed-potions"]}</strong>
-            </div>
-          </div>
-          {debugLines.length ? (
-            <div className="auto-capture-debug">
-              {debugLines.map((line) => (
-                <p key={line} className="helper-text auto-capture-debug-line">
-                  {line}
-                </p>
-              ))}
-            </div>
-          ) : null}
-        </>
-      ) : null}
-    </section>
-  );
-}
-
-function AutoCaptureCalibrationModal({ session, onCancel, onRetake, onSelect }) {
-  const nextItem = NARWASHI_AUTO_CAPTURE_ITEMS[session.selections.length];
-
-  function getImagePoint(event) {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const scaleX = session.imageWidth / bounds.width;
-    const scaleY = session.imageHeight / bounds.height;
-    return {
-      x: Math.round((event.clientX - bounds.left) * scaleX),
-      y: Math.round((event.clientY - bounds.top) * scaleY)
-    };
-  }
-
-  function handleImageClick(event) {
-    const { x, y } = getImagePoint(event);
-    onSelect({ itemId: nextItem.id, x, y });
-  }
-
-  return (
-    <div className="auto-capture-modal-backdrop" role="dialog" aria-modal="true">
-      <div className="auto-capture-modal page-panel">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Calibration</p>
-            <h2>Click the {nextItem.name} icon</h2>
-            <p className="subtle-text">
-              Click the center of one visible {nextItem.shortName.toLowerCase()} slot. FarmTracks will find the open
-              bag grids automatically when scanning.
-            </p>
-          </div>
-          <div className="auto-capture-actions">
-            <button type="button" className="secondary-button" onClick={onRetake}>
-              Retake screenshot
-            </button>
-            <button type="button" className="ghost-button" onClick={onCancel}>
-              Cancel
-            </button>
-          </div>
-        </div>
-
-        <div className="auto-capture-selection-list">
-          {NARWASHI_AUTO_CAPTURE_ITEMS.map((item, index) => {
-            const selection = session.selections[index];
-            return (
-              <span key={item.id} className={`status-pill ${selection ? "" : "offline"}`}>
-                {selection ? `${index + 1}. ${item.name} saved` : `${index + 1}. Click ${item.name}`}
-              </span>
-            );
-          })}
-        </div>
-
-        <div className="auto-capture-image-shell">
-          <img
-            src={session.screenshotDataUrl}
-            alt="Game screenshot for auto-capture calibration"
-            className="auto-capture-image"
-            onClick={handleImageClick}
-          />
-          {session.selections.map((selection, index) => (
-            <span
-              key={`${selection.itemId}-${index}`}
-              className="auto-capture-marker"
-              style={{
-                left: `${(selection.x / session.imageWidth) * 100}%`,
-                top: `${(selection.y / session.imageHeight) * 100}%`
-              }}
-            >
-              {index + 1}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function CapturePanel({
   formMessage,
@@ -786,16 +565,15 @@ function OverlayScannerPanel({
   nextRoundNumber,
   formMessage,
   resetConfirmMsg,
-  ocrSetupMsg,
   inventoryInputs,
   onInventoryChange,
   onCaptureRound,
   roundGains,
   hotkeys,
   onSaveHotkeys,
-  scanRegion,
-  onSetBagArea,
-  onClearBagArea,
+  trackerRegions,
+  onSetTrackerRegion,
+  onClearTrackerRegion,
 }) {
   const [showManual, setShowManual] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -823,10 +601,6 @@ function OverlayScannerPanel({
 
         {scannerError ? (
           <p className="feedback-text overlay-scanner-error">{scannerError}</p>
-        ) : null}
-
-        {ocrSetupMsg ? (
-          <p className="overlay-ocr-setup-msg">{ocrSetupMsg}</p>
         ) : null}
 
         <div className="overlay-item-grid">
@@ -889,18 +663,30 @@ function OverlayScannerPanel({
 
         {formMessage ? <p className="overlay-form-message">{formMessage}</p> : null}
 
-        <div className="overlay-bag-area-row">
-          {scanRegion ? (
-            <>
-              <span className="overlay-bag-area-set">Bag area set</span>
-              <button type="button" className="overlay-zero-btn" onClick={onSetBagArea}>Change</button>
-              <button type="button" className="overlay-zero-btn" onClick={onClearBagArea}>Clear</button>
-            </>
-          ) : (
-            <button type="button" className="overlay-bag-area-btn" onClick={onSetBagArea}>
-              Set bag area — fix detection
-            </button>
-          )}
+        <div className="overlay-bag-area-row" style={{ flexDirection: "column", gap: 4 }}>
+          {[
+            { key: "crystals", label: "Crystals" },
+            { key: "arcanes", label: "Arcanes" },
+            { key: "speed-potions", label: "Potions" },
+          ].map(({ key, label }) => {
+            const hasRegion = Boolean(trackerRegions?.[key]?.region);
+            return (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ flex: 1, fontSize: "0.78em", opacity: 0.75 }}>{label}</span>
+                {hasRegion ? (
+                  <>
+                    <span className="overlay-bag-area-set" style={{ fontSize: "0.75em" }}>✓</span>
+                    <button type="button" className="overlay-zero-btn" onClick={() => onSetTrackerRegion(key)}>Change</button>
+                    <button type="button" className="overlay-zero-btn" onClick={() => onClearTrackerRegion(key)}>Clear</button>
+                  </>
+                ) : (
+                  <button type="button" className="overlay-bag-area-btn" style={{ flex: 2 }} onClick={() => onSetTrackerRegion(key)}>
+                    Set region
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="overlay-session-meta">
@@ -1011,11 +797,6 @@ function App() {
   const [formMessage, setFormMessage] = useState("");
   const [overlayGuideMode, setOverlayGuideMode] = useState("");
   const [overlayOpacity, setOverlayOpacity] = useState(78);
-  const [autoCaptureProfile, setAutoCaptureProfile] = useState(() => loadNarwashiAutoCaptureProfile());
-  const [autoCaptureBusy, setAutoCaptureBusy] = useState(false);
-  const [autoCaptureMessage, setAutoCaptureMessage] = useState("");
-  const [autoCaptureResult, setAutoCaptureResult] = useState(null);
-  const [calibrationSession, setCalibrationSession] = useState(null);
   const [guideLanguage, setGuideLanguage] = useState(() => loadUiState().guideLanguage || "en");
   const [showWelcomeGuide, setShowWelcomeGuide] = useState(() => {
     if (typeof window === "undefined") {
@@ -1038,8 +819,7 @@ function App() {
   const [scannerError, setScannerError] = useState("");
   const [lastScanAt, setLastScanAt] = useState(null);
   const [resetConfirmMsg, setResetConfirmMsg] = useState("");
-  const [ocrSetupMsg, setOcrSetupMsg] = useState("");
-  const [scanRegion, setScanRegion] = useState(null);
+  const [trackerRegions, setTrackerRegions] = useState({});
 
   // Refs so hotkey handlers always see the latest values despite the [] closure
   const scannerLatestSnapshotRef = useRef(null);
@@ -1205,24 +985,13 @@ function App() {
       setHotkeys(hk);
     });
 
-    window.farmtracksDesktop.getScanRegion?.().then((r) => setScanRegion(r ?? null)).catch(() => {});
-    const unsubRegion = window.farmtracksDesktop.onScanRegionUpdated?.((r) => setScanRegion(r ?? null)) ?? (() => {});
-
-    const unsubOcr = window.farmtracksDesktop.onOcrSetup?.((payload) => {
-      if (payload.status === "done") {
-        setOcrSetupMsg("");
-      } else if (payload.status === "downloading" || payload.status === "installing") {
-        setOcrSetupMsg(payload.message ?? "Setting up OCR…");
-      } else {
-        setOcrSetupMsg(""); // error: silent, scanner just shows 1s
-      }
-    }) ?? (() => {});
+    window.farmtracksDesktop.getTrackerRegions?.().then((r) => setTrackerRegions(r ?? {})).catch(() => {});
+    const unsubRegion = window.farmtracksDesktop.onTrackerRegionsUpdated?.((r) => setTrackerRegions(r ?? {})) ?? (() => {});
 
     return () => {
       unsubUpdate();
       unsubHotkey();
       unsubHotkeys();
-      unsubOcr();
       unsubRegion();
     };
   }, []);
@@ -1388,101 +1157,6 @@ function App() {
     setFormMessage(`Current session reset for ${selectedPlayer.name}.`);
   }
 
-  async function handleStartAutoCaptureCalibration() {
-    setAutoCaptureBusy(true);
-    setAutoCaptureMessage("");
-
-    try {
-      const screenshotDataUrl = await captureDesktopScreenshot({ hideCurrentWindow: true });
-      const screenshotImage = new Image();
-      screenshotImage.src = screenshotDataUrl;
-      await screenshotImage.decode();
-
-      setCalibrationSession({
-        screenshotDataUrl,
-        imageWidth: screenshotImage.width,
-        imageHeight: screenshotImage.height,
-        selections: []
-      });
-    } catch (error) {
-      setAutoCaptureMessage(error instanceof Error ? error.message : "Unable to capture the screen for calibration.");
-    } finally {
-      setAutoCaptureBusy(false);
-    }
-  }
-
-  async function handleRetakeAutoCaptureCalibration() {
-    await handleStartAutoCaptureCalibration();
-  }
-
-  async function handleSelectCalibrationPoint(selection) {
-    if (!calibrationSession) {
-      return;
-    }
-
-    const nextSelections = [...calibrationSession.selections, selection];
-
-    if (nextSelections.length < NARWASHI_AUTO_CAPTURE_ITEMS.length) {
-      setCalibrationSession({
-        ...calibrationSession,
-        selections: nextSelections
-      });
-      return;
-    }
-
-    setAutoCaptureBusy(true);
-
-    try {
-      const nextProfile = await createNarwashiAutoCaptureProfile({
-        screenshotDataUrl: calibrationSession.screenshotDataUrl,
-        selections: nextSelections
-      });
-
-      setAutoCaptureProfile(nextProfile);
-      setCalibrationSession(null);
-      setAutoCaptureResult(null);
-      setAutoCaptureMessage("Calibration saved. You can now auto-fill or auto-capture Narwashi rounds.");
-    } catch (error) {
-      setAutoCaptureMessage(error instanceof Error ? error.message : "Unable to save auto-capture calibration.");
-    } finally {
-      setAutoCaptureBusy(false);
-    }
-  }
-
-  function handleClearAutoCaptureCalibration() {
-    clearNarwashiAutoCaptureProfile();
-    setAutoCaptureProfile(null);
-    setAutoCaptureResult(null);
-    setAutoCaptureMessage("Saved Narwashi calibration cleared.");
-  }
-
-  async function runNarwashiAutoCapture(autoSubmit) {
-    setAutoCaptureBusy(true);
-    setAutoCaptureMessage("");
-
-    try {
-      const result = await scanNarwashiScreen(autoCaptureProfile, { hideCurrentWindow: true });
-      const mergedSnapshot = mergeWithCurrentSnapshot(selectedMap, selectedSession?.currentSnapshot, result.snapshot);
-      const mergedResult = { ...result, snapshot: mergedSnapshot };
-      const providerLabel = result.provider === "autohotkey" ? "using AutoHotkey image matching" : "using the built-in scanner";
-      const summary = `Detected ${mergedSnapshot.crystals} crystals, ${mergedSnapshot.arcanes} arcanes, and ${mergedSnapshot["speed-potions"]} speed potions from ${result.matches.length} matched slots ${providerLabel}.`;
-
-      setAutoCaptureResult(mergedResult);
-      setInventoryInputs(buildInventoryInputs(selectedMap, mergedSnapshot));
-
-      if (autoSubmit) {
-        const captured = applySnapshot(mergedSnapshot, "auto-capture");
-        setAutoCaptureMessage(captured ? `${summary} Round recorded automatically.` : `${summary} Review the filled values before capturing.`);
-      } else {
-        setAutoCaptureMessage(`${summary} Review the filled values or press Auto-capture round.`);
-      }
-    } catch (error) {
-      setAutoCaptureMessage(error instanceof Error ? error.message : "Auto-capture failed.");
-    } finally {
-      setAutoCaptureBusy(false);
-    }
-  }
-
   function handleStartScanner() {
     if (isDesktopShell) {
       window.farmtracksDesktop.startScanner();
@@ -1529,14 +1203,14 @@ function App() {
   handleEndScannerRoundRef.current = handleEndScannerRound;
   handleResetPendingRoundRef.current = handleResetPendingRound;
 
-  function handleSetBagArea() {
+  function handleSetTrackerRegion(trackerKey) {
     if (!isDesktopShell) return;
-    window.farmtracksDesktop.openRegionSelector();
+    window.farmtracksDesktop.openTrackerRegionSelector(trackerKey);
   }
 
-  function handleClearBagArea() {
+  function handleClearTrackerRegion(trackerKey) {
     if (!isDesktopShell) return;
-    window.farmtracksDesktop.clearScanRegion();
+    window.farmtracksDesktop.clearTrackerRegion(trackerKey);
   }
 
   function handleSaveHotkeys(next) {
@@ -1605,16 +1279,15 @@ function App() {
             nextRoundNumber={nextRoundNumber}
             formMessage={formMessage}
             resetConfirmMsg={resetConfirmMsg}
-            ocrSetupMsg={ocrSetupMsg}
             inventoryInputs={inventoryInputs}
             onInventoryChange={handleInventoryChange}
             onCaptureRound={() => applySnapshot(normalizeRoundInput(selectedMap, inventoryInputs), "manual input")}
             roundGains={roundGains}
             hotkeys={hotkeys}
             onSaveHotkeys={handleSaveHotkeys}
-            scanRegion={scanRegion}
-            onSetBagArea={handleSetBagArea}
-            onClearBagArea={handleClearBagArea}
+            trackerRegions={trackerRegions}
+            onSetTrackerRegion={handleSetTrackerRegion}
+            onClearTrackerRegion={handleClearTrackerRegion}
           />
         ) : (
           <p className="overlay-scanner-waiting">Preparing session…</p>

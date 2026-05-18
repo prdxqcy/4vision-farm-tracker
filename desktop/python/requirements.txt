@@ -1,6 +1,5 @@
-mss>=9.0.1
-opencv-python>=4.9.0
-numpy>=1.26.0
-pytesseract>=0.3.10
-# Optional – uncomment if you prefer EasyOCR instead of pytesseract:
-# easyocr>=1.7.1
+mss==10.1.0
+numpy==2.2.6
+Pillow==11.2.1
+rapidocr-onnxruntime==1.4.4
+pyinstaller==6.20.0

@@ -1,7 +1,7 @@
 {
   "name": "farmtracks",
   "private": true,
-  "version": "1.0.33",
+  "version": "1.0.34",
   "main": "desktop/main.cjs",
   "workspaces": [
     "client",
@@ -29,9 +29,7 @@
   },
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^4.22.2",
-    "screenshot-desktop": "^1.15.4",
-    "tesseract.js": "^7.0.0"
+    "express": "^4.22.2"
   },
   "build": {
     "appId": "com.vision4.farmtracks",
@@ -47,11 +45,7 @@
       "package.json"
     ],
     "asar": true,
-    "asarUnpack": [
-      "node_modules/screenshot-desktop/lib/win32/**/*",
-      "desktop/ahk/**/*",
-      "desktop/python/templates/**/*"
-    ],
+    "asarUnpack": [],
     "extraResources": [
       {
         "from": "desktop/python/dist/farmtracks-capture",

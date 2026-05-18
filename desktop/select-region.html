@@ -46,7 +46,7 @@
   </style>
 </head>
 <body>
-  <div id="hint">Drag a box around ALL your open bags, then release</div>
+  <div id="hint">Drag a box around your item count, then confirm</div>
   <div id="confirm-bar">
     <button id="btn-cancel">Cancel</button>
     <button id="btn-redo">Redo</button>
@@ -60,6 +60,10 @@
     const ctx = canvas.getContext("2d");
     const hint = document.getElementById("hint");
     const bar = document.getElementById("confirm-bar");
+
+    const params = new URLSearchParams(window.location.search);
+    const trackerLabel = params.get("label") || "item";
+    hint.textContent = `Drag a box around your ${trackerLabel} count, then confirm`;
 
     canvas.width  = window.screen.width;
     canvas.height = window.screen.height;
@@ -85,7 +89,7 @@
       start = { x: e.clientX, y: e.clientY };
       sel = null;
       bar.style.display = "none";
-      hint.textContent = "Hold and drag to the bottom-right corner of your bags";
+      hint.textContent = `Hold and drag to cover the ${trackerLabel} count number`;
     });
 
     canvas.addEventListener("mousemove", (e) => {
@@ -122,7 +126,7 @@
       sel = null; start = null;
       bar.style.display = "none";
       drawOverlay(null);
-      hint.textContent = "Drag a box around ALL your open bags, then release";
+      hint.textContent = `Drag a box around your ${trackerLabel} count, then confirm`;
     });
 
     document.getElementById("btn-cancel").addEventListener("click", () => {

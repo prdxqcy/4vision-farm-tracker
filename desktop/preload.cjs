@@ -2,8 +2,6 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("farmtracksDesktop", {
   isDesktop: true,
-  captureScreen: (options) => ipcRenderer.invoke("farmtracks:capture-screen", options),
-  detectAutoCapture: (profile, options) => ipcRenderer.invoke("farmtracks:detect-auto-capture", profile, options),
   closeCurrentWindow: () => ipcRenderer.invoke("farmtracks:close-window"),
   openMainWindow: () => ipcRenderer.invoke("farmtracks:open-main-window"),
   openOverlayWindow: () => ipcRenderer.invoke("farmtracks:open-overlay"),
@@ -37,20 +35,13 @@ contextBridge.exposeInMainWorld("farmtracksDesktop", {
     return () => ipcRenderer.removeListener("farmtracks:hotkeys-updated", handler);
   },
 
-  // Scan region (bag area selector)
-  openRegionSelector: () => ipcRenderer.invoke("farmtracks:open-region-selector"),
-  getScanRegion: () => ipcRenderer.invoke("farmtracks:get-scan-region"),
-  clearScanRegion: () => ipcRenderer.invoke("farmtracks:clear-scan-region"),
-  onScanRegionUpdated: (callback) => {
+  // Per-tracker scan regions
+  openTrackerRegionSelector: (trackerKey) => ipcRenderer.invoke("farmtracks:open-tracker-region-selector", trackerKey),
+  getTrackerRegions: () => ipcRenderer.invoke("farmtracks:get-tracker-regions"),
+  clearTrackerRegion: (trackerKey) => ipcRenderer.invoke("farmtracks:clear-tracker-region", trackerKey),
+  onTrackerRegionsUpdated: (callback) => {
     const handler = (_event, payload) => callback(payload);
-    ipcRenderer.on("farmtracks:scan-region-updated", handler);
-    return () => ipcRenderer.removeListener("farmtracks:scan-region-updated", handler);
-  },
-
-  // OCR auto-install progress
-  onOcrSetup: (callback) => {
-    const handler = (_event, payload) => callback(payload);
-    ipcRenderer.on("farmtracks:ocr-setup", handler);
-    return () => ipcRenderer.removeListener("farmtracks:ocr-setup", handler);
+    ipcRenderer.on("farmtracks:tracker-regions-updated", handler);
+    return () => ipcRenderer.removeListener("farmtracks:tracker-regions-updated", handler);
   },
 });
